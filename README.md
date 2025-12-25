@@ -1,0 +1,1 @@
+[![CI Pipeline](https://github.com/Wiko55/movie-recommender/actions/workflows/ci.yml/badge.svg)](https://github.com/Wiko55/movie-recommender/actions/workflows/ci.yml)
