@@ -23,27 +23,29 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
+    # KROK: Tworzenie danych (Poprawione wcięcia)
     - name: Create Dummy Data
-          run: |
-            mkdir -p data/raw
-            echo "movieId,title,genres" > data/raw/movies.csv
-            echo "1,Toy Story (1995),Adventure|Animation|Children|Comedy|Fantasy" >> data/raw/movies.csv
-            echo "2,Jumanji (1995),Adventure|Children|Fantasy" >> data/raw/movies.csv
-            
-            echo "userId,movieId,rating,timestamp" > data/raw/ratings.csv
-            echo "1,1,4.0,964982703" >> data/raw/ratings.csv
-            echo "1,2,4.0,964982703" >> data/raw/ratings.csv
-            
-    - name: Debug - List all files
-          run: |
-            echo "=== Current Directory ==="
-            pwd
-            echo "=== File Structure ==="
-            ls -R
-        - name: Generate Model
-          run: |
-            PYTHONPATH=. uv run python -c "from src.dataprocessing import load_and_process; from src.recommender import MovieRecommender; from pathlib import Path; df=load_and_process(); rec=MovieRecommender(); rec.fit(df); rec.save(Path('model_v1.joblib')); print('Model generated')"
+      run: |
+        mkdir -p data/raw
+        echo "movieId,title,genres" > data/raw/movies.csv
+        echo "1,Toy Story (1995),Adventure|Animation|Children|Comedy|Fantasy" >> data/raw/movies.csv
+        echo "2,Jumanji (1995),Adventure|Children|Fantasy" >> data/raw/movies.csv
+        
+        echo "userId,movieId,rating,timestamp" > data/raw/ratings.csv
+        echo "1,1,4.0,964982703" >> data/raw/ratings.csv
+        echo "1,2,4.0,964982703" >> data/raw/ratings.csv
 
+    # KROK: Debugowanie (Sprawdzenie czy pliki powstały)
+    - name: Debug - List all files
+      run: |
+        echo "=== Current Directory ==="
+        pwd
+        echo "=== File Structure ==="
+        ls -R
+
+    - name: Generate Model
+      run: |
+        PYTHONPATH=. uv run python -c "from src.dataprocessing import load_and_process; from src.recommender import MovieRecommender; from pathlib import Path; df=load_and_process(); rec=MovieRecommender(); rec.fit(df); rec.save(Path('model_v1.joblib')); print('✅ Model generated')"
 
     - name: Build Docker Image
       run: docker build -t movie-recommender:ci .
