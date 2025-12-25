@@ -23,36 +23,45 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
-    - name: Create Dummy Data
+    # --- ZMIANA: GENERUJEMY 2500 OCEN (50x50) ---
+    - name: Create Massive Dummy Data
       run: |
         mkdir -p data/raw
         uv run python -c "
         import pandas as pd
         import random
 
+        # 1. Generujemy 50 filmów (ID 1-50)
+        # To da nam pewność, że mamy 'masę'
         movies_data = {
-            'movieId': list(range(1, 21)),
-            'title': [f'Movie {i}' for i in range(1, 21)],
-            'genres': ['Comedy|Action' for _ in range(20)]
+            'movieId': list(range(1, 51)),
+            'title': [f'Movie {i}' for i in range(1, 51)],
+            'genres': ['Comedy|Action' for _ in range(50)]
         }
         pd.DataFrame(movies_data).to_csv('data/raw/movies.csv', index=False)
 
+        # 2. Generujemy 'Pełną Macierz' (Dense Matrix)
+        # 50 użytkowników x 50 filmów = 2500 ocen.
+        # Każdy film będzie miał 50 ocen. Każdy user 50 ocen.
+        # To musi przejść przez filtry.
         ratings = []
-        for user_id in range(1, 6):
-            for movie_id in range(1, 21):
-                ratings.append([user_id, movie_id, 4.0, 964982703])
+        for user_id in range(1, 51):
+            for movie_id in range(1, 51):
+                # Losowa ocena 3.0 - 5.0
+                rating = round(random.uniform(3.0, 5.0), 1)
+                ratings.append([user_id, movie_id, rating, 964982703])
         
         pd.DataFrame(ratings, columns=['userId', 'movieId', 'rating', 'timestamp']).to_csv('data/raw/ratings.csv', index=False)
-        print('Generated rich dummy data: 20 movies, 100 ratings')
+        print(f'✅ Generated MASSIVE data: {len(ratings)} ratings')
         "
 
-    - name: Debug - List all files
-      run: |
-        ls -R data/raw
+    - name: Debug - Check Files
+      run: ls -R data/raw
 
     - name: Generate Model
+      # Dodaliśmy print(df.shape), żebyś widział w logach, ile danych weszło do modelu
       run: |
-        PYTHONPATH=. uv run python -c "from src.dataprocessing import load_and_process; from src.recommender import MovieRecommender; from pathlib import Path; df=load_and_process(); rec=MovieRecommender(); rec.fit(df); rec.save(Path('model_v1.joblib')); print('✅ Model generated')"
+        PYTHONPATH=. uv run python -c "from src.dataprocessing import load_and_process; from src.recommender import MovieRecommender; from pathlib import Path; df=load_and_process(); print(f'DATA SHAPE: {df.shape}'); rec=MovieRecommender(); rec.fit(df); rec.save(Path('model_v1.joblib')); print('✅ Model generated')"
 
     - name: Build Docker Image
       run: docker build -t movie-recommender:ci .
