@@ -1,0 +1,9 @@
+ data/
+ *.csv
+ .venv/
+.venv
+__pycache__
+*.pyc
+.DS_Store
+*.joblib
+*.csv
