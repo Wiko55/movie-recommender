@@ -10,4 +10,4 @@ COL_MOVIE_ID = "movieId"
 COL_TITLE = "title"
 COL_RATING = "rating"
 
-MIN_VOTES = 50
+MIN_VOTES = 20
