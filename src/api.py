@@ -27,7 +27,7 @@ app = FastAPI(title="Recommender API", lifespan=lifespan)
 
 @app.get("/")
 def read_root():
-    return {"status": "strona zyje", "messege": "API dziala poprawnie"}
+    return {"status": "Strona zyje", "messege": "API dziala poprawnie!"}
 
 
 @app.get("/recommend/{user_id}")
