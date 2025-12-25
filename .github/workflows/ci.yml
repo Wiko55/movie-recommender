@@ -22,7 +22,17 @@ jobs:
 
     - name: Install dependencies
       run: uv sync
-
+      
+    - name: Create Dummy Data
+          run: |
+            mkdir -p data/raw
+            echo "movieId,title,genres" > data/raw/movies.csv
+            echo "1,Toy Story (1995),Adventure|Animation|Children|Comedy|Fantasy" >> data/raw/movies.csv
+            echo "2,Jumanji (1995),Adventure|Children|Fantasy" >> data/raw/movies.csv
+            
+            echo "userId,movieId,rating,timestamp" > data/raw/ratings.csv
+            echo "1,1,4.0,964982703" >> data/raw/ratings.csv
+            echo "1,2,4.0,964982703" >> data/raw/ratings.csv
 
     - name: Generate Model
       run: |
