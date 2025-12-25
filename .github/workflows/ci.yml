@@ -23,25 +23,32 @@ jobs:
     - name: Install dependencies
       run: uv sync
 
-    # KROK: Tworzenie danych (Poprawione wcięcia)
     - name: Create Dummy Data
       run: |
         mkdir -p data/raw
-        echo "movieId,title,genres" > data/raw/movies.csv
-        echo "1,Toy Story (1995),Adventure|Animation|Children|Comedy|Fantasy" >> data/raw/movies.csv
-        echo "2,Jumanji (1995),Adventure|Children|Fantasy" >> data/raw/movies.csv
-        
-        echo "userId,movieId,rating,timestamp" > data/raw/ratings.csv
-        echo "1,1,4.0,964982703" >> data/raw/ratings.csv
-        echo "1,2,4.0,964982703" >> data/raw/ratings.csv
+        uv run python -c "
+        import pandas as pd
+        import random
 
-    # KROK: Debugowanie (Sprawdzenie czy pliki powstały)
+        movies_data = {
+            'movieId': list(range(1, 21)),
+            'title': [f'Movie {i}' for i in range(1, 21)],
+            'genres': ['Comedy|Action' for _ in range(20)]
+        }
+        pd.DataFrame(movies_data).to_csv('data/raw/movies.csv', index=False)
+
+        ratings = []
+        for user_id in range(1, 6):
+            for movie_id in range(1, 21):
+                ratings.append([user_id, movie_id, 4.0, 964982703])
+        
+        pd.DataFrame(ratings, columns=['userId', 'movieId', 'rating', 'timestamp']).to_csv('data/raw/ratings.csv', index=False)
+        print('Generated rich dummy data: 20 movies, 100 ratings')
+        "
+
     - name: Debug - List all files
       run: |
-        echo "=== Current Directory ==="
-        pwd
-        echo "=== File Structure ==="
-        ls -R
+        ls -R data/raw
 
     - name: Generate Model
       run: |
