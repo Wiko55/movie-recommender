@@ -12,8 +12,7 @@ models = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Pobieranie danych z serwera")
-    data_path = Path("data/raw")
-    matrix = load_and_process(data_path)
+    matrix = load_and_process()
     rec = MovieRecommender(n_clusters=5)
     rec.fit(matrix=matrix)
     models["recommender"] = rec
@@ -36,7 +35,7 @@ def get_recommendations(user_id: int) -> dict:
     rec = models["recommender"]
     if not rec:
         raise HTTPException(status_code=500, detail="Model niedostępny")
-    recommendations = rec.recommendation(user_id)
+    recommendations = rec.recommend(user_id)
     if not recommendations:
         raise HTTPException(
             status_code=404, detail="Nie ma takiego uzytkownika w bazie"
