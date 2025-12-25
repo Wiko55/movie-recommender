@@ -22,7 +22,7 @@ jobs:
 
     - name: Install dependencies
       run: uv sync
-      
+
     - name: Create Dummy Data
           run: |
             mkdir -p data/raw
@@ -33,10 +33,16 @@ jobs:
             echo "userId,movieId,rating,timestamp" > data/raw/ratings.csv
             echo "1,1,4.0,964982703" >> data/raw/ratings.csv
             echo "1,2,4.0,964982703" >> data/raw/ratings.csv
-
-    - name: Generate Model
-      run: |
-        PYTHONPATH=. uv run python -c "from src.dataprocessing import load_and_process; from src.recommender import MovieRecommender; from pathlib import Path; df=load_and_process(); rec=MovieRecommender(); rec.fit(df); rec.save(Path('model_v1.joblib')); print('Model generated')"
+            
+    - name: Debug - List all files
+          run: |
+            echo "=== Current Directory ==="
+            pwd
+            echo "=== File Structure ==="
+            ls -R
+        - name: Generate Model
+          run: |
+            PYTHONPATH=. uv run python -c "from src.dataprocessing import load_and_process; from src.recommender import MovieRecommender; from pathlib import Path; df=load_and_process(); rec=MovieRecommender(); rec.fit(df); rec.save(Path('model_v1.joblib')); print('Model generated')"
 
 
     - name: Build Docker Image
