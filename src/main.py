@@ -40,6 +40,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Movie Recommender API", lifespan=lifespan)
 
 
+@app.get("/")
+async def read_root():
+    return {"status": "Serwer zyje", "message": "Główna strona modelu"}
+
+
 @app.get("/health", response_model=HealthCheck)
 async def health_check():
     """Endpoint dla Kubernetesa?"""
