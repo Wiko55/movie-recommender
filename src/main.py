@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 
 from src.recommender import MovieRecommender
-from src.schemas import HealthCheck, RecommendationResponse
+from src.schemas import HealthCheck, LandingPage, RecommendationResponse
 
 # Setup loggera
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +42,7 @@ app = FastAPI(title="Movie Recommender API", lifespan=lifespan)
 
 @app.get("/")
 async def read_root():
-    return {"status": "Serwer zyje", "message": "Główna strona modelu"}
+    return LandingPage(status_serwera="Żyje", messege="Strona z rekomendacjami filmów")
 
 
 @app.get("/health", response_model=HealthCheck)
