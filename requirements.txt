@@ -6,3 +6,5 @@ joblib
 pydantic
 pytest
 httpx
+streamlit
+requests
