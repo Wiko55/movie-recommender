@@ -52,8 +52,8 @@ async def health_check():
     return HealthCheck(status="ok", running_model=is_ready)
 
 
-@app.get("/recommend/{user_id}", response_model=RecommendationResponse)
-async def get_recommendations(user_id: int, top_n: int = 5):
+@app.get("/recommend/{user_id}/{top_n}", response_model=RecommendationResponse)
+async def get_recommendations(user_id: int, top_n: int):
     """
     Główny endpoint biznesowy.
     """
