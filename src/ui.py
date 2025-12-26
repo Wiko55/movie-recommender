@@ -13,8 +13,11 @@ st.write("Wybierz ID użytkownika, a AI dobierze dla niego najlepsze filmy!")
 
 with st.sidebar:
     st.header("⚙️ Panel Sterowania")
-    user_id = st.number_input(
-        "Podaj ID użytkownika:", min_value=1, max_value=1000, value=10
+    user_id = st.number_input("Podaj ID użytkownika:", min_value=1, max_value=1000)
+    movies_quantity = int(
+        st.number_input(
+            "Podaj oczekiwaną ilość rekomendacji:", min_value=1, max_value=10, value=3
+        )
     )
 
     if st.button("Sprawdź połączenie z serwerem"):
@@ -28,17 +31,16 @@ with st.sidebar:
             st.error("Nie można połączyć z API. Czy link jest poprawny?")
 
 if st.button("🔍 Znajdź filmy", type="primary"):
-    with st.spinner("AI analizuje miliony (no, setki) ocen..."):
+    with st.spinner("AI analizuje oceny..."):
         try:
             response = requests.get(f"{API_URL}/recommend/{user_id}")
 
             if response.status_code == 200:
                 data = response.json()
-                recommendations = data.get("recommendations", [])
+                recommendations = data.get("recommendations", [])[:movies_quantity]
 
                 if recommendations:
                     st.subheader(f"Filmy polecane dla Użytkownika {user_id}:")
-
                     for i, movie in enumerate(recommendations, 1):
                         st.info(f"🎥 {i}. {movie}")
                 else:
