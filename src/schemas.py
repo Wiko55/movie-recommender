@@ -12,3 +12,8 @@ class RecommendationResponse(BaseModel):
 class HealthCheck(BaseModel):
     status: str
     running_model: bool
+
+
+class LandingPage(BaseModel):
+    status_serwera: str
+    messege: str
