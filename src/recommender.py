@@ -46,14 +46,11 @@ class MovieRecommender(BaseRecommender):
         self.cluster_recommendations: dict = {}
         self.user_cluster_map: dict = {}
         self.is_fitted: bool = False
-        self.feature_matrix = None
 
     @measure_execution_time
     def fit(self, matrix: pd.DataFrame) -> None:
         """Trenuje model i liczy top filmy dla każdego klastra."""
         logger.info(f"Trenowanie K-Means dla {self.n_clusters} klastrów...")
-        self.feature_matrix = matrix.to_numpy()
-        global_variance = np.var(self.feature_matrix)
         logger.info(f"Wariancja danych wynosi {global_variance:.4f}")
 
         self.kmeans.fit(matrix)
@@ -107,43 +104,3 @@ class MovieRecommender(BaseRecommender):
             raise FileNotFoundError(f"Brak modelu pod ścieżką: {path}")
         logger.info(f"Wczytywanie modelu z {path}")
         return joblib.load(path)
-
-    def generate_report(self, filename="raport_wynikow.txt"):
-        """
-        Tworzy plik tekstowy z podsumowaniem działania modelu.
-        """
-        if not self.is_fitted:
-            print("Model niewytrenowany")
-            return
-
-        logger.info(f"Generowanie raportu do pliku {filename}...")
-        report_df = pd.DataFrame({"cluster": self.kmeans.labels_})
-
-        # Pandas: Gropowanie i liczenie ilu userów w kazdym z klastrów
-        cluster_counts = report_df["cluster"].value_counts().sort_index()
-
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write("=" * 40 + "\n")
-            f.write(f"RAPORT MODELU REKOMENDACJI\n")
-            f.write(f"Data generowania: {datetime.datetime.now()}\n")
-            f.write("=" * 40 + "\n\n")
-
-            f.write(f"Liczba klastrów: {self.n_clusters}\n")
-            f.write(
-                f"Liczba przeanalizowanych użytkowników: {len(self.kmeans.labels_)}\n\n"
-            )
-
-            f.write("--- ROZKŁAD UŻYTKOWNIKÓW W KLASTRACH ---\n")
-            for cluster_id, count in cluster_counts.items():
-                percentage = (count / len(self.kmeans.labels_)) * 100
-                f.write(
-                    f"Klaster {cluster_id}: {count} użytkowników ({percentage:.1f}%)\n"
-                )
-
-            f.write("\n--- TOP FILMY DLA KLASTRÓW ---\n")
-            for cluster_id, movies in self.cluster_recommendations.items():
-                f.write(f"\n[Klaster {cluster_id}] Polecane filmy:\n")
-                for i, movie in enumerate(movies[:3], 1):  # Pokaż top 3
-                    f.write(f"   {i}. {movie}\n")
-
-        print(f"Raport zapisany pomyślnie: {filename}")
