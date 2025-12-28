@@ -11,3 +11,5 @@ COL_TITLE = "title"
 COL_RATING = "rating"
 
 MIN_VOTES = 20
+
+CACHE_MAX_ITEMS = 25

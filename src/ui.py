@@ -16,7 +16,7 @@ with st.sidebar:
     user_id = st.number_input("Podaj ID użytkownika:", min_value=1, max_value=1000)
     top_n = int(
         st.number_input(
-            "Podaj oczekiwaną ilość rekomendacji:", min_value=1, max_value=10, value=3
+            "Podaj oczekiwaną ilość rekomendacji:", min_value=1, max_value=25, value=3
         )
     )
 
@@ -33,11 +33,11 @@ with st.sidebar:
 if st.button("🔍 Znajdź filmy", type="primary"):
     with st.spinner("AI analizuje oceny..."):
         try:
-            response = requests.get(f"{API_URL}/recommend/{user_id}/{top_n}")
+            response = requests.get(f"{API_URL}/recommend/{user_id}")
 
             if response.status_code == 200:
                 data = response.json()
-                recommendations = data.get("recommendations", [])
+                recommendations = data.get("recommendations", [])[:top_n]
 
                 if recommendations:
                     st.subheader(f"Filmy polecane dla Użytkownika {user_id}:")

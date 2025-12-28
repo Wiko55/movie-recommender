@@ -1,0 +1,18 @@
+services:
+  # Serwis 1: Twoja Aplikacja
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis_db  # Nazwa serwisu poniżej
+    depends_on:
+      - redis_db
+    volumes:
+      - ./src:/app/src       # Hot-reloading! Zmienisz kod lokalnie -> zmieni się w kontenerze
+
+  # Serwis 2: Baza Redis (Pamięć podręczna)
+  redis_db:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"

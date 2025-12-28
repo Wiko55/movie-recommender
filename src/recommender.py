@@ -16,6 +16,8 @@ from abc import ABC, abstractmethod
 
 from src.decorators import measure_execution_time
 
+CACHE_MAX_ITEMS = config.CACHE_MAX_ITEMS
+
 
 class BaseRecommender(ABC):
     """
@@ -71,7 +73,9 @@ class MovieRecommender(BaseRecommender):
             mean_ratings = pd.Series(mean_ratings_array, index=ratings_only.columns)
             # mean_ratings = cluster_users.drop(columns=["cluster"]).mean(axis=0)
             top_movies = (
-                mean_ratings.sort_values(ascending=False).head(20).index.tolist()
+                mean_ratings.sort_values(ascending=False)
+                .head(CACHE_MAX_ITEMS)
+                .index.tolist()
             )
             self.cluster_recommendations[cluster_id] = top_movies
 

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class RecommendationResponse(BaseModel):
     user_id: int
     recommendations: List[str]
+    source: str
     model_version: str
 
 
