@@ -26,11 +26,6 @@ def load_and_process() -> pd.DataFrame:
     logger.info("Rozpoczynanie procesu ETL (Extract-Transform-Load)...")
 
     try:
-        # Uzycie generatora do przetwarzania danych
-        print(f"🔍 Sprawdzanie pierwszych wierszy pliku generatorem")
-        for line in batch_file_reader(movies_path, n_lines=3):
-            print(f"   [Generator]: {line.strip()}")
-
         df_movies = pd.read_csv(movies_path)
         df_ratings = pd.read_csv(ratings_path)
 
@@ -55,17 +50,3 @@ def load_and_process() -> pd.DataFrame:
     except Exception as e:
         logger.error(f"Błąd podczas przetwarzania danych: {e}")
         raise e
-
-
-def batch_file_reader(filepath: str, n_lines: int = 5):
-    """
-    Generator czytający plik tekstowy linijka po linijce.
-    Yielduje kolejne linie tekstu bez ładowania całości do RAMu.
-    """
-    with open(filepath, "r", encoding="utf-8") as f:
-        # Pominiecie nagłówka
-        next(f)
-        for i, line in enumerate(f):
-            if i >= n_lines:
-                break
-            yield line
