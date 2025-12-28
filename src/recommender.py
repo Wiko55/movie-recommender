@@ -51,7 +51,6 @@ class MovieRecommender(BaseRecommender):
     def fit(self, matrix: pd.DataFrame) -> None:
         """Trenuje model i liczy top filmy dla każdego klastra."""
         logger.info(f"Trenowanie K-Means dla {self.n_clusters} klastrów...")
-        logger.info(f"Wariancja danych wynosi {global_variance:.4f}")
 
         self.kmeans.fit(matrix)
         cluster_labels = self.kmeans.labels_
