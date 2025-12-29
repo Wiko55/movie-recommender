@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -79,12 +80,12 @@ async def health_check():
     return HealthCheck(status="ok", running_model=is_ready)
 
 
-@app.get("/recommend/{user_id}/{top_n}", response_model=RecommendationResponse)
-async def get_recommendations(user_id: int, top_n: int):
+@app.get("/recommend/{user_id}", response_model=RecommendationResponse)
+async def get_recommendations(user_id: int, top_n: int = CACHE_MAX_ITEMS):
     """
     Główny endpoint biznesowy.
     """
-    top_n = CACHE_MAX_ITEMS if top_n < CACHE_MAX_ITEMS else top_n
+    top_n = CACHE_MAX_ITEMS if top_n > CACHE_MAX_ITEMS else top_n
     # 1. Sprawdzenie cache
     cache_key = f"rec_user_{user_id}"
     if redis_client:
@@ -115,7 +116,7 @@ async def get_recommendations(user_id: int, top_n: int):
         response_payload = {
             "user_id": user_id,
             "source": "model_computation",
-            "recommendations": full_recs,  # Tutaj zapisujemy całą 50-tkę
+            "recommendations": full_recs,
         }
 
         # 3. ZAPIS DO CACHE (Pełna lista 50 filmów)
