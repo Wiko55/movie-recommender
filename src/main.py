@@ -4,7 +4,6 @@ from pathlib import Path
 
 import redis
 from fastapi import FastAPI, HTTPException
-from src.visualization import save_cluster_plot
 
 from src import config
 from src.dataprocessing import load_and_process
