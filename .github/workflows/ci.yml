@@ -59,7 +59,6 @@ jobs:
       run: ls -R data/raw
 
     - name: Generate Model
-      # Dodaliśmy print(df.shape), żebyś widział w logach, ile danych weszło do modelu
       run: |
         PYTHONPATH=. uv run python -c "from src.dataprocessing import load_and_process; from src.recommender import MovieRecommender; from pathlib import Path; df=load_and_process(); print(f'DATA SHAPE: {df.shape}'); rec=MovieRecommender(); rec.fit(df); rec.save(Path('model_v1.joblib')); print('✅ Model generated')"
 
@@ -67,4 +66,4 @@ jobs:
       run: docker build -t movie-recommender:ci .
 
     - name: Run Tests inside Docker
-      run: docker run --rm movie-recommender:ci pytest tests/test_api.py -v
+      run: docker run --rm movie-recommender:ci uv run pytest tests/test_api.py -v
