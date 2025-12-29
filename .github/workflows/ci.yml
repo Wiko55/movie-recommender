@@ -66,4 +66,4 @@ jobs:
       run: docker build -t movie-recommender:ci .
 
     - name: Run Tests inside Docker
-      run: docker run --rm movie-recommender:ci uv run pytest tests/test_api.py -v
+      run: docker run --rm movie-recommender:ci pytest tests/test_api.py -v
