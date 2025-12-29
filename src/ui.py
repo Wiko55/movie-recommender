@@ -2,6 +2,8 @@ import pandas as pd
 import requests
 import streamlit as st
 
+import config
+
 API_URL = "https://movie-recommender-wiktor.onrender.com"
 
 st.set_page_config(page_title="System Rekomendacji Filmów", page_icon="🎬")
@@ -13,10 +15,15 @@ st.write("Wybierz ID użytkownika, a AI dobierze dla niego najlepsze filmy!")
 
 with st.sidebar:
     st.header("⚙️ Panel Sterowania")
-    user_id = st.number_input("Podaj ID użytkownika:", min_value=1, max_value=1000)
+    user_id = st.number_input(
+        "Podaj ID użytkownika:", min_value=1, max_value=100, value=1
+    )
     top_n = int(
         st.number_input(
-            "Podaj oczekiwaną ilość rekomendacji:", min_value=1, max_value=25, value=3
+            "Podaj oczekiwaną ilość rekomendacji:",
+            min_value=1,
+            max_value=config.CACHE_MAX_ITEMS,
+            value=3,
         )
     )
 
