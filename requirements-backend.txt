@@ -225,3 +225,4 @@ watchdog==6.0.0 ; sys_platform != 'darwin'
     # via streamlit
 wcwidth==0.2.14
     # via prompt-toolkit
+httpx
