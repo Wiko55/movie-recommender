@@ -12,12 +12,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-backend.txt .
+RUN pip install pytest
 RUN pip install --no-cache-dir -r requirements-backend.txt
 
 COPY . .
 
-ENV PATH="/app/.venv/bin:$PATH"
-
 EXPOSE 8000
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--pogrt", "8000"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

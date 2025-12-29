@@ -67,4 +67,4 @@ jobs:
     - name: 🔍 Debug - Pokaż strukturę plików
       run: docker run --rm movie-recommender:ci ls -R /app
     - name: Run Tests inside Docker
-      run: docker run --rm movie-recommender:ci /app/.venv/bin/pytest tests/test_api.py -v
+      run: docker run --rm movie-recommender:ci pytest tests/test_api.py -v
