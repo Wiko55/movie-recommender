@@ -122,8 +122,8 @@ async def get_recommendations(user_id: int, top_n: int):
             redis_client.setex(cache_key, 60, json.dumps(response_payload))
             
         return RecommendationResponse(
-        user_id=user_id, recommendations=full_recs[:top_n], source= 'model_computation' model_version="v1"
+        user_id=user_id, recommendations=full_recs[:top_n], source= 'model_computation', model_version="v1"
     )
         
-    except ValueError as e:
+    except ValueError as e
         raise HTTPException(status_code=404, detail=str(e))
