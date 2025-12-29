@@ -4,12 +4,12 @@ from pathlib import Path
 
 import redis
 from fastapi import FastAPI, HTTPException
+from src.visualization import save_cluster_plot
 
 from src import config
 from src.dataprocessing import load_and_process
 from src.recommender import MovieRecommender
 from src.schemas import HealthCheck, LandingPage, RecommendationResponse
-from src.visualization import save_cluster_plot
 
 # Setup loggera - wypisuje info w konsoli
 logging.basicConfig(level=logging.INFO)
@@ -97,33 +97,38 @@ async def get_recommendations(user_id: int, top_n: int):
             data["recommendations"] = data["recommendations"][:top_n]
             data["source"] = "cache"  # Nadpisujemy źródło
             return RecommendationResponse(
-                user_id=user_id, recommendations=data["recommendations"][:top_n], source= 'cache', model_version="v1"
-    )
-
+                user_id=user_id,
+                recommendations=data["recommendations"][:top_n],
+                source="cache",
+                model_version="v1",
+            )
 
     # 2. OBLICZENIA (Cache Miss)
     logger.info(f"CACHE MISS: Liczę model dla {user_id}")
     model = ml_models.get("recommender")
-    
+
     if model is None:
         raise HTTPException(status_code=503, detail="Model niedostępny")
-    
+
     try:
         full_recs = model.recommend(user_id, top_n=CACHE_MAX_ITEMS)
-        
+
         response_payload = {
             "user_id": user_id,
             "source": "model_computation",
-            "recommendations": full_recs # Tutaj zapisujemy całą 50-tkę
+            "recommendations": full_recs,  # Tutaj zapisujemy całą 50-tkę
         }
 
         # 3. ZAPIS DO CACHE (Pełna lista 50 filmów)
         if redis_client:
             redis_client.setex(cache_key, 60, json.dumps(response_payload))
-            
+
         return RecommendationResponse(
-        user_id=user_id, recommendations=full_recs[:top_n], source= 'model_computation', model_version="v1"
-    )
-        
-    except ValueError as e
+            user_id=user_id,
+            recommendations=full_recs[:top_n],
+            source="model_computation",
+            model_version="v1",
+        )
+
+    except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
