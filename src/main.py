@@ -155,7 +155,11 @@ async def get_recommendations(user_id: int, top_n: int = 5):
         )
     # 4. ZAPIS DO CACHE
     if redis_client and final_items:
-        payload = {"user_id": user_id, "recommendations": final_items, "source"='model_computation'}
+        payload = {
+            "user_id": user_id,
+            "recommendations": final_items,
+            "source": "model_computation",
+        }
         try:
             redis_client.setex(
                 cache_key, 60 * 10, json.dumps(payload)
