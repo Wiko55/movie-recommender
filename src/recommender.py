@@ -61,7 +61,7 @@ class MovieRecommender:
             favorites = user_ratings.sort_values("rating", ascending=False).head(3)
 
         # Bierzemy top 3 ulubione filmy usera i szukamy dla nich podobnych
-        recommendations = set()
+        recommendations = []
 
         for movie_id in favorites["movieId"].head(3).tolist():
             if movie_id not in self.movie_to_idx:
@@ -76,21 +76,32 @@ class MovieRecommender:
             )
 
             # Dodaj znalezione tytuły do zbioru (zbiór usuwa duplikaty)
-            for i in indices.flatten()[1:]:  # Pomin [0], bo to ten sam film
+            for i, d in zip(
+                indices.flatten()[1:top_n], distances.flatten()[1:top_n]
+            ):  # Pomin [0], bo to ten sam film
                 neighbor_id = self.idx_to_movie[i]
                 # Pobierz tytuł z DataFrame'a filmów
                 title = self.movies_df[self.movies_df["movieId"] == neighbor_id][
                     "title"
                 ].values[0]
-                recommendations.add(title)
+                scoring = (1 - d) * user_ratings[user_ratings["movieId"] == movie_id][
+                    "rating"
+                ].values[0]
+                recommendations.append([scoring, title])
+        movies_sorted = sorted(
+            list(recommendations), reverse=True, key=lambda item: item[0]
+        )[:top_n]
+        seen_titles = set()
+        final_list = []
 
-                if len(recommendations) >= top_n:
-                    break
-
-            if len(recommendations) >= top_n:
+        for score, title in movies_sorted:
+            if title not in seen_titles:
+                final_list.append(title)
+                seen_titles.add(title)
+            if len(final_list) >= top_n:
                 break
 
-        return list(recommendations)[:top_n]
+        return [final_list]
 
     def get_popular_movies(self, top_n: int = 5):
         """
@@ -106,7 +117,7 @@ class MovieRecommender:
         top_ids = rating_counts.sort_values(ascending=False).head(top_n).index
 
         # 3. Zamieniamy ID na tytuły
-        popular_titles = self.movies_df[self.movies_df["movieId"].isin(top_ids)][
+        popular_titles = self.ratings_df[self.ratings_df["movieId"].isin(top_ids)][
             "title"
         ].tolist()
 
