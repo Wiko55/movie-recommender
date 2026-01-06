@@ -1,77 +1,83 @@
-import pandas as pd
 import requests
 import streamlit as st
 
-import config
+# Konfiguracja strony
+st.set_page_config(page_title="Movie Recommender", page_icon="🎬", layout="wide")
 
-API_URL = "https://movie-recommender-wiktor.onrender.com"
+API_URL = "http://localhost:8000/recommend"
 
-st.set_page_config(page_title="System Rekomendacji Filmów", page_icon="🎬")
-
-
+# Nagłówek
 st.title("🎬 Twój Asystent Filmowy")
-st.write("Wybierz ID użytkownika, a AI dobierze dla niego najlepsze filmy!")
+st.write("Wybierz ID użytkownika i liczbę filmów, a AI zrobi resztę!")
 
+# --- NOWOŚĆ: Układ kolumnowy dla inputów ---
+col1, col2 = st.columns(2)
 
-with st.sidebar:
-    st.header("⚙️ Panel Sterowania")
+with col1:
     user_id = st.number_input(
-        "Podaj ID użytkownika:", min_value=1, max_value=100, value=1
-    )
-    top_n = int(
-        st.number_input(
-            "Podaj oczekiwaną ilość rekomendacji:",
-            min_value=1,
-            max_value=config.CACHE_MAX_ITEMS,
-            value=3,
-        )
+        "Podaj ID użytkownika:", min_value=1, max_value=200000, value=1
     )
 
-    if st.button("Sprawdź połączenie z serwerem"):
-        try:
-            r = requests.get(f"{API_URL}/health")
-            if r.status_code == 200:
-                st.success("Serwer działa poprawnie!")
-            else:
-                st.error(f"Błąd serwera: {r.status_code}")
-        except:
-            st.error("Nie można połączyć z API. Czy link jest poprawny?")
+with col2:
+    # Suwak do wyboru liczby rekomendacji (od 1 do 10)
+    top_n = st.slider("Ile rekomendacji pokazać?", min_value=1, max_value=10, value=5)
 
-if st.button("🔍 Znajdź filmy", type="primary"):
-    with st.spinner("AI analizuje oceny..."):
+if st.button("🔍 Znajdź filmy"):
+    with st.spinner("AI analizuje Twój gust..."):
         try:
-            response = requests.get(f"{API_URL}/recommend/{user_id}")
+            # Pytamy API (przekazujemy dynamiczne top_n z suwaka)
+            response = requests.get(f"{API_URL}/{user_id}", params={"top_n": top_n})
 
             if response.status_code == 200:
                 data = response.json()
                 recs = data.get("recommendations", [])
+                source = data.get("source", "unknown")
+
+                # Info o źródle
+                if source == "cache":
+                    st.info("⚡ Wynik z pamięci podręcznej (Cache)")
+                elif source == "popularity_fallback":
+                    st.warning(
+                        "❄️ User nieznany - wyświetlamy Globalne Hity (Cold Start)"
+                    )
+                else:
+                    st.success("🧠 Rekomendacja z modelu ML")
 
                 if recs:
                     st.subheader(f"🍿 Filmy wybrane dla Ciebie (User {user_id}):")
 
-                    # Tworzymy siatkę (grid) z plakatami
-                    cols = st.columns(len(recs))  # Tyle kolumn ile filmów
+                    # Tworzymy tyle kolumn, ile filmów przyszło z API
+                    cols = st.columns(len(recs))
 
                     for idx, movie in enumerate(recs):
                         with cols[idx]:
-                            # Jeśli jest plakat, wyświetl go
-                            if movie.get("poster"):
-                                st.image(movie["poster"], use_container_width=True)
-                            else:
-                                # Placeholder jeśli brak zdjęcia
+                            # Logika Defensywna (działa dla napisów i obrazków)
+                            if isinstance(movie, dict):
+                                title = movie.get("title", "Bez tytułu")
+                                poster = movie.get("poster")
+
+                                if poster:
+                                    st.image(poster, use_container_width=True)
+                                else:
+                                    st.image(
+                                        "https://via.placeholder.com/300x450?text=No+Poster",
+                                        use_container_width=True,
+                                    )
+                                st.caption(f"**{title}**")
+
+                            elif isinstance(movie, str):
                                 st.image(
                                     "https://via.placeholder.com/300x450?text=No+Poster",
                                     use_container_width=True,
                                 )
+                                st.caption(f"**{movie}**")
+                            else:
+                                st.error("Błąd danych")
 
-                            # Tytuł pod zdjęciem (zmniejszony font)
-                            st.caption(f"**{movie['title']}**")
                 else:
                     st.warning("Brak rekomendacji.")
+            else:
+                st.error(f"Błąd API: {response.status_code}")
 
         except Exception as e:
             st.error(f"Wystąpił błąd połączenia: {e}")
-
-
-st.divider()
-st.caption(f"Backend obsługiwany przez: {API_URL}")

@@ -49,7 +49,7 @@ class MovieRecommender:
         user_ratings = self.ratings_df[self.ratings_df["userId"] == user_id]
 
         if user_ratings.empty:
-            return ["Brak danych o użytkowniku - to tzw. Cold Start Problem!"]
+            return []
 
         # Weź filmy ocenione na >= 4.0, posortowane malejąco
         favorites = user_ratings[user_ratings["rating"] >= 4.0].sort_values(
@@ -91,6 +91,26 @@ class MovieRecommender:
                 break
 
         return list(recommendations)[:top_n]
+
+    def get_popular_movies(self, top_n: int = 5):
+        """
+        Zwraca listę tytułów najpopularniejszych filmów (wg liczby ocen).
+        """
+        if self.ratings_df is None or self.movies_df is None:
+            return []
+
+        # 1. Liczymy ile razy każdy film był oceniany
+        rating_counts = self.ratings_df.groupby("movieId").count()["rating"]
+
+        # 2. Sortujemy malejąco i bierzemy top N ID filmów
+        top_ids = rating_counts.sort_values(ascending=False).head(top_n).index
+
+        # 3. Zamieniamy ID na tytuły
+        popular_titles = self.movies_df[self.movies_df["movieId"].isin(top_ids)][
+            "title"
+        ].tolist()
+
+        return popular_titles[:top_n]
 
 
 if __name__ == "__main__":

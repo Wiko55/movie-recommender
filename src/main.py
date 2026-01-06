@@ -142,8 +142,12 @@ async def get_recommendations(user_id: int, top_n: int = 5):
 
     # 3. Posters
     if not titles:
-        final_items = []
-    else:
+        logger.info(f"Cold Start dla User {user_id} - serwuję Hity Globalne")
+        titles = model.get_popular_movies(top_n=CACHE_MAX_ITEMS)
+        logger.info(f" {user_id} - serwuję Hity Globalne")
+        source = "popularity_fallback"
+
+    if titles:
         final_items = fetch_posters_for_movies(
             movies_data[movies_data["title"].isin(titles)], links_data, top_n=limit
         )
