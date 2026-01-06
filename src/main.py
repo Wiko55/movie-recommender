@@ -157,6 +157,7 @@ async def get_recommendations(user_id: int, top_n: int = 5):
             "user_id": user_id,
             "recommendations": final_items,
             "source": "model_computation",
+            "model_version": "v2_knn",
         }
         try:
             redis_client.setex(
@@ -171,3 +172,47 @@ async def get_recommendations(user_id: int, top_n: int = 5):
         source="model_computation",
         model_version="v2_knn",
     )
+
+
+@app.get("/similar/{movie_title}", response_model=RecommendationResponse)
+async def get_similar_movies(movie_title: str, top_n: int = 5):
+    """
+    Rekomenduje filmy podobne do podanego tytułu.
+    """
+    limit = min(top_n, CACHE_MAX_ITEMS)
+    # Prosty cache key
+    cache_key = f"rec_movie_{movie_title.replace(' ', '_').lower()}"
+
+    # 1. CACHE
+    if redis_client:
+        cached = redis_client.get(cache_key)
+        if cached:
+            return RecommendationResponse(**json.loads(cached))
+
+    # 2. MODEL
+    model = ml_models.get("latest")
+    if not model or movies_data is None:
+        raise HTTPException(status_code=503, detail="System niegotowy")
+
+    titles = model.get_recommendations_for_movie(movie_title, top_n=limit)
+
+    # 3. PLAKATY
+    if not titles:
+        final_items = []
+    else:
+        final_items = fetch_posters_for_movies(
+            movies_data[movies_data["title"].isin(titles)], links_data, top_n=limit
+        )
+
+    response = {
+        "user_id": 0,
+        "recommendations": final_items,
+        "source": "item_item_similarity",
+        "model_version": "v2_knn",
+    }
+
+    # 4. ZAPIS DO CACHE
+    if redis_client:
+        redis_client.setex(cache_key, 600, json.dumps(response))
+
+    return RecommendationResponse(**response)

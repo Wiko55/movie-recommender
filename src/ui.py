@@ -1,83 +1,99 @@
 import requests
 import streamlit as st
 
-# Konfiguracja strony
 st.set_page_config(page_title="Movie Recommender", page_icon="🎬", layout="wide")
+API_URL = "http://localhost:8000"
 
-API_URL = "http://localhost:8000/recommend"
-
-# Nagłówek
 st.title("🎬 Twój Asystent Filmowy")
-st.write("Wybierz ID użytkownika i liczbę filmów, a AI zrobi resztę!")
 
-# --- NOWOŚĆ: Układ kolumnowy dla inputów ---
-col1, col2 = st.columns(2)
+# Zakładki
+tab1, tab2 = st.tabs(["👤 Rekomendacje dla Usera", "🔎 Podobne do Filmu"])
 
-with col1:
-    user_id = st.number_input(
-        "Podaj ID użytkownika:", min_value=1, max_value=200000, value=1
-    )
+# --- ZAKŁADKA 1: USER ---
+with tab1:
+    st.write("Wybierz ID użytkownika, a AI dobierze dla niego filmy.")
+    col1, col2 = st.columns(2)
+    with col1:
+        user_id = st.number_input(
+            "Podaj ID użytkownika:", min_value=1, max_value=200000, value=1
+        )
+    with col2:
+        top_n_user = st.slider("Ile filmów?", 1, 10, 5, key="slider_user")
 
-with col2:
-    # Suwak do wyboru liczby rekomendacji (od 1 do 10)
-    top_n = st.slider("Ile rekomendacji pokazać?", min_value=1, max_value=10, value=5)
+    if st.button("Znajdź dla Usera"):
+        with st.spinner("Szukam..."):
+            try:
+                res = requests.get(
+                    f"{API_URL}/recommend/{user_id}", params={"top_n": top_n_user}
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    recs = data.get("recommendations", [])
 
-if st.button("🔍 Znajdź filmy"):
-    with st.spinner("AI analizuje Twój gust..."):
-        try:
-            # Pytamy API (przekazujemy dynamiczne top_n z suwaka)
-            response = requests.get(f"{API_URL}/{user_id}", params={"top_n": top_n})
-
-            if response.status_code == 200:
-                data = response.json()
-                recs = data.get("recommendations", [])
-                source = data.get("source", "unknown")
-
-                # Info o źródle
-                if source == "cache":
-                    st.info("⚡ Wynik z pamięci podręcznej (Cache)")
-                elif source == "popularity_fallback":
-                    st.warning(
-                        "❄️ User nieznany - wyświetlamy Globalne Hity (Cold Start)"
-                    )
-                else:
-                    st.success("🧠 Rekomendacja z modelu ML")
-
-                if recs:
-                    st.subheader(f"🍿 Filmy wybrane dla Ciebie (User {user_id}):")
-
-                    # Tworzymy tyle kolumn, ile filmów przyszło z API
-                    cols = st.columns(len(recs))
-
-                    for idx, movie in enumerate(recs):
-                        with cols[idx]:
-                            # Logika Defensywna (działa dla napisów i obrazków)
-                            if isinstance(movie, dict):
-                                title = movie.get("title", "Bez tytułu")
-                                poster = movie.get("poster")
-
-                                if poster:
-                                    st.image(poster, use_container_width=True)
+                    # Wyświetlanie (funkcja pomocnicza by się przydała, ale skopiujmy pętlę)
+                    if recs:
+                        cols = st.columns(len(recs))
+                        for idx, movie in enumerate(recs):
+                            with cols[idx]:
+                                if isinstance(movie, dict):
+                                    poster = movie.get("poster")
+                                    if poster:
+                                        st.image(poster, use_container_width=True)
+                                    else:
+                                        st.image(
+                                            "https://via.placeholder.com/300x450",
+                                            use_container_width=True,
+                                        )
+                                    st.caption(f"**{movie.get('title')}**")
                                 else:
-                                    st.image(
-                                        "https://via.placeholder.com/300x450?text=No+Poster",
-                                        use_container_width=True,
-                                    )
-                                st.caption(f"**{title}**")
+                                    st.write(movie)
+                    else:
+                        st.warning("Brak wyników.")
+            except Exception as e:
+                st.error(f"Błąd: {e}")
 
-                            elif isinstance(movie, str):
-                                st.image(
-                                    "https://via.placeholder.com/300x450?text=No+Poster",
-                                    use_container_width=True,
-                                )
-                                st.caption(f"**{movie}**")
-                            else:
-                                st.error("Błąd danych")
+# --- ZAKŁADKA 2: FILM ---
+with tab2:
+    st.write("Wpisz tytuł filmu, który lubisz (np. Toy Story, Batman, Inception).")
+    col1, col2 = st.columns(2)
+    with col1:
+        movie_query = st.text_input("Tytuł filmu:")
+    with col2:
+        top_n_movie = st.slider("Ile filmów?", 1, 10, 5, key="slider_movie")
 
-                else:
-                    st.warning("Brak rekomendacji.")
-            else:
-                st.error(f"Błąd API: {response.status_code}")
+    if st.button("Znajdź podobne"):
+        if not movie_query:
+            st.warning("Wpisz tytuł!")
+        else:
+            with st.spinner(f"Szukam filmów podobnych do '{movie_query}'..."):
+                try:
+                    # Request do nowego endpointu
+                    res = requests.get(
+                        f"{API_URL}/similar/{movie_query}",
+                        params={"top_n": top_n_movie},
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        recs = data.get("recommendations", [])
 
-        except Exception as e:
-            st.error(f"Wystąpił błąd połączenia: {e}")
+                        if recs:
+                            st.subheader(f"Ponieważ lubisz '{movie_query}':")
+                            cols = st.columns(len(recs))
+                            for idx, movie in enumerate(recs):
+                                with cols[idx]:
+                                    if isinstance(movie, dict):
+                                        poster = movie.get("poster")
+                                        if poster:
+                                            st.image(poster, use_container_width=True)
+                                        else:
+                                            st.image(
+                                                "https://via.placeholder.com/300x450",
+                                                use_container_width=True,
+                                            )
+                                        st.caption(f"**{movie.get('title')}**")
+                        else:
+                            st.warning("Nie znalazłem takiego filmu w bazie :(")
+                    else:
+                        st.error("Błąd API.")
+                except Exception as e:
+                    st.error(f"Błąd: {e}")

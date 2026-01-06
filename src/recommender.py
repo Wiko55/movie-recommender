@@ -112,6 +112,48 @@ class MovieRecommender:
 
         return popular_titles[:top_n]
 
+    def get_recommendations_for_movie(self, movie_title: str, top_n: int = 5):
+        """
+        Znajduje filmy podobne do podanego tytułu (Item-Item Filtering).
+        """
+        # 1. Znajdź ID filmu na podstawie tytułu (szukanie fragmentu tekstu)
+        # Robimy lowercase, żeby wielkość liter nie miała znaczenia
+        matches = self.movies_df[
+            self.movies_df["title"].str.contains(movie_title, case=False, na=False)
+        ]
+
+        if matches.empty:
+            return []
+
+        # Bierzemy pierwszy pasujący film (najbardziej prawdopodobny)
+        target_movie_id = matches.iloc[0]["movieId"]
+        target_title = matches.iloc[0]["title"]
+        print(f"🔍 Szukam podobnych do: {target_title} (ID: {target_movie_id})")
+
+        if target_movie_id not in self.movie_to_idx:
+            return []
+
+        # 2. Pobierz wektor tego filmu
+        idx = self.movie_to_idx[target_movie_id]
+        movie_vec = self.movie_user_mat[idx]
+        print(f"******** CSR: *******\n {self.movie_user_mat}")
+        print(f"******** CSR[idx]: *******\n {movie_vec}")
+        # 3. Znajdź sąsiadów
+        distances, indices = self.model.kneighbors(movie_vec, n_neighbors=top_n + 1)
+
+        recommendations = []
+        for i in indices.flatten():
+            neighbor_id = self.idx_to_movie[i]
+            if neighbor_id == target_movie_id:
+                continue  # Pomiń ten sam film
+
+            title = self.movies_df[self.movies_df["movieId"] == neighbor_id][
+                "title"
+            ].values[0]
+            recommendations.append(title)
+
+        return recommendations[:top_n]
+
 
 if __name__ == "__main__":
     # Szybki test lokalny
