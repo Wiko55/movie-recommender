@@ -30,7 +30,7 @@ def download_and_extract_data():
             elif file.endswith("ratings.csv"):
                 with open(RATINGS_PATH, "wb") as f:
                     f.write(z.read(file))
-            elif file.endswith("links"):
+            elif file.endswith("links.csv"):
                 with open(LINKS_PATH, "wb") as f:
                     f.write(z.read(file))
         print("Dane pobrane i zapisane w folderze data/")
