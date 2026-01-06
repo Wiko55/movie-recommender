@@ -44,19 +44,30 @@ if st.button("🔍 Znajdź filmy", type="primary"):
 
             if response.status_code == 200:
                 data = response.json()
-                recommendations = data.get("recommendations", [])[:top_n]
+                recs = data.get("recommendations", [])
 
-                if recommendations:
-                    st.subheader(f"Filmy polecane dla Użytkownika {user_id}:")
-                    for i, movie in enumerate(recommendations, 1):
-                        st.info(f"🎥 {i}. {movie}")
+                if recs:
+                    st.subheader(f"🍿 Filmy wybrane dla Ciebie (User {user_id}):")
+
+                    # Tworzymy siatkę (grid) z plakatami
+                    cols = st.columns(len(recs))  # Tyle kolumn ile filmów
+
+                    for idx, movie in enumerate(recs):
+                        with cols[idx]:
+                            # Jeśli jest plakat, wyświetl go
+                            if movie.get("poster"):
+                                st.image(movie["poster"], use_container_width=True)
+                            else:
+                                # Placeholder jeśli brak zdjęcia
+                                st.image(
+                                    "https://via.placeholder.com/300x450?text=No+Poster",
+                                    use_container_width=True,
+                                )
+
+                            # Tytuł pod zdjęciem (zmniejszony font)
+                            st.caption(f"**{movie['title']}**")
                 else:
-                    st.warning(
-                        "Brak rekomendacji dla tego użytkownika (może to nowy użytkownik?)."
-                    )
-            else:
-                st.error("Wystąpił błąd po stronie serwera API.")
-                st.write(response.json())
+                    st.warning("Brak rekomendacji.")
 
         except Exception as e:
             st.error(f"Wystąpił błąd połączenia: {e}")

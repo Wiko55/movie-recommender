@@ -994,6 +994,7 @@ dependencies = [
     { name = "redis" },
     { name = "requests" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "streamlit" },
     { name = "uvicorn" },
 ]
@@ -1012,6 +1013,7 @@ requires-dist = [
     { name = "redis", specifier = ">=7.1.0" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
+    { name = "scipy", specifier = ">=1.16.3" },
     { name = "streamlit", specifier = ">=1.52.2" },
     { name = "uvicorn", specifier = ">=0.38.0" },
 ]

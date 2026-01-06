@@ -1,109 +1,106 @@
-import datetime
-import logging
-from pathlib import Path
-from typing import List, Optional
-
-import joblib
-import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
-
-from src import config
-
-logger = logging.getLogger(__name__)
-
-from abc import ABC, abstractmethod
-
-from src.decorators import measure_execution_time
-
-CACHE_MAX_ITEMS = config.CACHE_MAX_ITEMS
+from scipy.sparse import csr_matrix
+from sklearn.neighbors import NearestNeighbors
 
 
-class BaseRecommender(ABC):
-    """
-    Abstrakcyjna klasa bazowa definiująca strukturę dla wszystkich rekomendatorów.
-    """
+class MovieRecommender:
+    def __init__(self):
+        self.model = NearestNeighbors(
+            metric="cosine", algorithm="brute", n_neighbors=20, n_jobs=-1
+        )
+        self.movie_user_mat = None
+        self.movies_df = None
+        self.ratings_df = None
 
-    @abstractmethod
-    def fit(self, matrix: pd.DataFrame) -> None:
-        """Każdy model musi umieć się wytrenować."""
-        pass
+    def fit(self, movies: pd.DataFrame, ratings: pd.DataFrame):
+        """
+        Trenuje model: Tworzy macierz Film-Użytkownik i uczy k-NN.
+        """
+        self.movies_df = movies
+        self.ratings_df = ratings
 
-    @abstractmethod
-    def recommend(self, user_id: int, top_n: int = 5) -> List[str]:
-        """Każdy model musi umieć rekomendować."""
-        pass
+        # 1. Pivot Table: Wiersze=Filmy, Kolumny=Userzy, Wartości=Oceny
+        # Wypełniamy zera (0) tam, gdzie ktoś nie ocenił filmu
+        pivot_table = ratings.pivot(
+            index="movieId", columns="userId", values="rating"
+        ).fillna(0)
 
+        # 2. Konwersja do macierzy rzadkiej (Sparse Matrix) - oszczędza RAM
+        # Nie trzymamy milionów zer w pamięci, tylko współrzędne ocen.
+        self.movie_user_mat = csr_matrix(pivot_table.values)
 
-class MovieRecommender(BaseRecommender):
-    """
-    System rekomendacyjny oparty na klastrowaniu K-Means.
-    Zapisuje stan modelu oraz pre-kalkulowane rekomendacje dla klastrów.
-    """
+        # Mapa mapująca ID filmu na indeks w macierzy (bo mogą być dziury w ID)
+        self.movie_to_idx = {movie: i for i, movie in enumerate(pivot_table.index)}
+        self.idx_to_movie = {i: movie for i, movie in enumerate(pivot_table.index)}
 
-    def __init__(self, n_clusters: int = 5, random_state: int = 42):
-        self.n_clusters = n_clusters
-        self.random_state = random_state
-        self.kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
-        self.cluster_recommendations: dict = {}
-        self.user_cluster_map: dict = {}
-        self.is_fitted: bool = False
+        # 3. Trening modelu (to trwa ułamek sekundy na małym zbiorze)
+        self.model.fit(self.movie_user_mat)
+        print(
+            "✅ Model wytrenowany na macierzy o wymiarach:", self.movie_user_mat.shape
+        )
 
-    @measure_execution_time
-    def fit(self, matrix: pd.DataFrame) -> None:
-        """Trenuje model i liczy top filmy dla każdego klastra."""
-        logger.info(f"Trenowanie K-Means dla {self.n_clusters} klastrów...")
+    def recommend(self, user_id: int, top_n: int = 5):
+        """
+        Prosta logika rekomendacji dla usera:
+        1. Znajdź filmy, które user ocenił najlepiej (5.0).
+        2. Dla każdego ulubionego filmu znajdź "sąsiadów" (podobne filmy).
+        """
+        # Pobierz filmy ocenione przez tego usera
+        user_ratings = self.ratings_df[self.ratings_df["userId"] == user_id]
 
-        self.kmeans.fit(matrix)
-        cluster_labels = self.kmeans.labels_
+        if user_ratings.empty:
+            return ["Brak danych o użytkowniku - to tzw. Cold Start Problem!"]
 
-        logger.info("Pre-kalkulacja rekomendacji dla klastrów...")
+        # Weź filmy ocenione na >= 4.0, posortowane malejąco
+        favorites = user_ratings[user_ratings["rating"] >= 4.0].sort_values(
+            "rating", ascending=False
+        )
 
-        temp_df = matrix.copy()
-        temp_df["cluster"] = cluster_labels
+        if favorites.empty:
+            # Jak ktoś tylko hejtuje filmy, weź cokolwiek co widział
+            favorites = user_ratings.sort_values("rating", ascending=False).head(3)
 
-        self.user_cluster_map = dict(zip(matrix.index, cluster_labels))
+        # Bierzemy top 3 ulubione filmy usera i szukamy dla nich podobnych
+        recommendations = set()
 
-        # Średnia ocen w klastrach
-        for cluster_id in range(self.n_clusters):
-            cluster_users = temp_df[temp_df["cluster"] == cluster_id]
-            ratings_only = cluster_users.drop(columns=["cluster"])
-            ratings_matrix = ratings_only.to_numpy()
-            mean_ratings_array = np.mean(ratings_matrix, axis=0)
-            mean_ratings = pd.Series(mean_ratings_array, index=ratings_only.columns)
-            # mean_ratings = cluster_users.drop(columns=["cluster"]).mean(axis=0)
-            top_movies = (
-                mean_ratings.sort_values(ascending=False)
-                .head(CACHE_MAX_ITEMS)
-                .index.tolist()
+        for movie_id in favorites["movieId"].head(3).tolist():
+            if movie_id not in self.movie_to_idx:
+                continue
+
+            # Znajdź indeks filmu w macierzy
+            idx = self.movie_to_idx[movie_id]
+
+            # Zapytaj model o sąsiadów
+            distances, indices = self.model.kneighbors(
+                self.movie_user_mat[idx], n_neighbors=top_n + 1
             )
-            self.cluster_recommendations[cluster_id] = top_movies
 
-        self.is_fitted = True
-        logger.info("Model wytrenowany i zoptymalizowany.")
+            # Dodaj znalezione tytuły do zbioru (zbiór usuwa duplikaty)
+            for i in indices.flatten()[1:]:  # Pomin [0], bo to ten sam film
+                neighbor_id = self.idx_to_movie[i]
+                # Pobierz tytuł z DataFrame'a filmów
+                title = self.movies_df[self.movies_df["movieId"] == neighbor_id][
+                    "title"
+                ].values[0]
+                recommendations.add(title)
 
-    def recommend(self, user_id: int, top_n: int = 5) -> List[str]:
-        if not self.is_fitted:
-            logger.error("Model nie jest wytrenowany!")
-            return []
+                if len(recommendations) >= top_n:
+                    break
 
-        cluster_id = self.user_cluster_map.get(user_id)
+            if len(recommendations) >= top_n:
+                break
 
-        if cluster_id is None:
-            logger.warning(f"User {user_id} nieznany. Zwracam puste.")
-            return []
+        return list(recommendations)[:top_n]
 
-        return self.cluster_recommendations.get(cluster_id, [])[:top_n]
 
-    def save(self, path: Path) -> None:
-        """Serializacja obiektu do pliku."""
-        logger.info(f"Zapisywanie modelu do {path}")
-        joblib.dump(self, path)
+if __name__ == "__main__":
+    # Szybki test lokalny
+    from data_loader import load_data
 
-    @staticmethod
-    def load(path: Path) -> "MovieRecommender":
-        """Deserializacja obiektu z pliku."""
-        if not path.exists():
-            raise FileNotFoundError(f"Brak modelu pod ścieżką: {path}")
-        logger.info(f"Wczytywanie modelu z {path}")
-        return joblib.load(path)
+    m, r = load_data()
+
+    rec = MovieRecommender()
+    rec.fit(m, r)
+
+    print("\nRekomendacje dla Usera 1:")
+    print(rec.recommend(1, 5))

@@ -14,6 +14,8 @@ appnope==0.1.4 ; sys_platform == 'darwin'
     # via ipykernel
 asttokens==3.0.1
     # via stack-data
+async-timeout==5.0.1 ; python_full_version < '3.11.3'
+    # via redis
 attrs==25.4.0
     # via
     #   jsonschema
@@ -215,7 +217,9 @@ rpds-py==0.30.0
 scikit-learn==1.7.2
     # via movie-recommender
 scipy==1.16.3
-    # via scikit-learn
+    # via
+    #   movie-recommender
+    #   scikit-learn
 six==1.17.0
     # via python-dateutil
 smmap==5.0.2
@@ -249,9 +253,13 @@ traitlets==5.14.3
 typing-extensions==4.15.0
     # via
     #   altair
+    #   anyio
     #   fastapi
+    #   ipython
     #   pydantic
     #   pydantic-core
+    #   referencing
+    #   starlette
     #   streamlit
     #   typing-inspection
 typing-inspection==0.4.2

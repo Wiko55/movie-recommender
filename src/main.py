@@ -1,134 +1,171 @@
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import redis
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
-from src import config
-from src.dataprocessing import load_and_process
+from src.data_loader import load_data
 from src.recommender import MovieRecommender
-from src.schemas import HealthCheck, LandingPage, RecommendationResponse
+from src.tmdb_client import fetch_posters_for_movies
 
-# Setup loggera - wypisuje info w konsoli
+# ------------------------------
+
+# Konfiguracja logowania
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("API")
+logger = logging.getLogger(__name__)
 
-# Setup redis
+# Konfiguracja Redisa
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-redis_client = None
-# Cache
-CACHE_MAX_ITEMS = config.CACHE_MAX_ITEMS
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 
-# Globalna zmienna na modele
+# Globalny słownik na modele
 ml_models = {}
+redis_client = None
+CACHE_MAX_ITEMS = 50
+movies_data = None
+links_data = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Zarządzanie cyklem życia aplikacji.
-    """
-    # Uruchamianie Redisa
+    # 1. START APLIKACJI
+    logger.info("🚀 Uruchamianie Systemu Rekomendacji...")
+
+    # --- ŁADOWANIE NOWEGO MODELU ---
+    try:
+        logger.info("📥 Pobieranie i ładowanie danych MovieLens...")
+        movies, ratings, links = load_data()
+        movies_data = movies
+        links_data = links
+
+        logger.info("🧠 Trenowanie modelu k-NN...")
+        recommender = MovieRecommender()
+        recommender.fit(movies, ratings)
+
+        ml_models["latest"] = recommender
+        logger.info("✅ Model gotowy do pracy!")
+    except Exception as e:
+        logger.error(f"❌ Błąd krytyczny podczas ładowania modelu: {e}")
+        ml_models["latest"] = None
+    # -------------------------------
+
+    # Redis Connection
     global redis_client
     try:
         redis_client = redis.Redis(
-            host=REDIS_HOST, port=6379, db=0, decode_responses=True
+            host=REDIS_HOST, port=REDIS_PORT, decode_responses=True
         )
-        redis_client.ping()  # Test połączenia
-        logger.info(f"Połączono z Redisem, host: {REDIS_HOST}")
-    except redis.ConnectionError:
-        logger.warning("Nie można połączyć z Redisem, cache nie będzie działać.")
+        if redis_client.ping():
+            logger.info(f"✅ Połączono z Redisem na {REDIS_HOST}")
+        else:
+            logger.warning("⚠️ Redis nie odpowiada (ale połączenie nawiązane).")
+    except Exception as e:
+        logger.warning(f"⚠️ Nie można połączyć z Redisem: {e}. Działamy bez Cache.")
         redis_client = None
 
-    # Ładowanie modelu
-    try:
-        model_path = Path("model_v1.joblib")
+    yield  # Tutaj aplikacja działa i obsługuje zapytania...
 
-        if model_path.exists():
-            logger.info(f"Ładowanie modelu z {model_path}...")
-            ml_models["recommender"] = MovieRecommender.load(model_path)
-            logger.info("Model załadowany do pamięci.")
-        else:
-            logger.error("❌ Brak pliku modelu!")
-            ml_models["recommender"] = None
-    except:
-        logger.info("Nieudane ładowanie modelu")
-
-    yield
-
+    # 2. ZAMYKANIE APLIKACJI
     ml_models.clear()
     if redis_client:
         redis_client.close()
-    logger.info("Aplikacja zatrzymana, Redis zamknięty")
+    logger.info("🛑 Aplikacja zatrzymana.")
 
 
-# Inicjalizacja FastAPI z defined lifespan
-app = FastAPI(title="Movie Recommender API", lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, title="Movie Recommender API")
 
 
-@app.get("/")
-async def read_root():
-    return LandingPage(status_serwera="Żyje", messege="Strona z rekomendacjami filmów")
+# Modele Pydantic
+class MovieItem(BaseModel):
+    title: str
+    poster: str | None = None
 
 
-@app.get("/health", response_model=HealthCheck)
-async def health_check():
-    """Endpoint dla Kubernetesa?"""
-    is_ready = ml_models.get("recommender") is not None
-    return HealthCheck(status="ok", running_model=is_ready)
+class HealthCheck(BaseModel):
+    status: str
+    model_loaded: bool
+    redis_connected: bool
+
+
+class RecommendationResponse(BaseModel):
+    user_id: int
+    recommendations: list[MovieItem]
+    source: str
+    model_version: str
+
+
+@app.get("/", summary="Read Root")
+def read_root():
+    return {"message": "Witaj w API Rekomendacji Filmów (Wersja ML)"}
+
+
+@app.get("/health", response_model=HealthCheck, summary="Health Check")
+def health_check():
+    return HealthCheck(
+        status="ok",
+        model_loaded="latest" in ml_models and ml_models["latest"] is not None,
+        redis_connected=redis_client is not None and redis_client.ping(),
+    )
 
 
 @app.get("/recommend/{user_id}", response_model=RecommendationResponse)
-async def get_recommendations(user_id: int, top_n: int = CACHE_MAX_ITEMS):
+async def get_recommendations(user_id: int, top_n: int = 5):
     """
-    Główny endpoint biznesowy.
+    Zwraca rekomendacje na podstawie Collaborative Filtering.
     """
-    top_n = CACHE_MAX_ITEMS if top_n > CACHE_MAX_ITEMS else top_n
-    # 1. Sprawdzenie cache
-    cache_key = f"rec_user_{user_id}"
-    if redis_client:
-        cached_data = redis_client.get(cache_key)
-        if cached_data:
-            data = json.loads(cached_data)
-            logger.info(f"CACHE HIT: Mam {CACHE_MAX_ITEMS} filmów, zwracam {top_n}")
+    limit = min(top_n, CACHE_MAX_ITEMS)
+    cache_key = f"rec_img_v1_{user_id}"  # Zmieniamy klucz na v2, bo mamy nowy model!
 
-            data["recommendations"] = data["recommendations"][:top_n]
-            data["source"] = "cache"  # Nadpisujemy źródło
-            return RecommendationResponse(
-                user_id=user_id,
-                recommendations=data["recommendations"][:top_n],
-                source="cache",
-                model_version="v1",
-            )
-
-    # 2. OBLICZENIA (Cache Miss)
-    logger.info(f"CACHE MISS: Liczę model dla {user_id}")
-    model = ml_models.get("recommender")
-
-    if model is None:
-        raise HTTPException(status_code=503, detail="Model niedostępny")
-
+    # 1. CACHE (Redis)
     try:
-        full_recs = model.recommend(user_id, top_n=CACHE_MAX_ITEMS)
-
-        response_payload = {
-            "user_id": user_id,
-            "source": "model_computation",
-            "recommendations": full_recs,
-        }
-
-        # 3. ZAPIS DO CACHE (Pełna lista 50 filmów)
         if redis_client:
-            redis_client.setex(cache_key, 60, json.dumps(response_payload))
+            cached_data = redis_client.get(cache_key)
+            if cached_data:
+                data = json.loads(cached_data)
+                return RecommendationResponse(
+                    user_id=user_id,
+                    recommendations=data["recommendations"][:limit],
+                    source="cache",
+                    model_version="v2_knn",
+                )
+    except Exception as e:
+        logger.error(f"Redis error: {e}")
 
-        return RecommendationResponse(
-            user_id=user_id,
-            recommendations=full_recs[:top_n],
-            source="model_computation",
-            model_version="v1",
+    # 2. MODEL ML (Obliczenia)
+    model = ml_models.get("latest")
+    if not model:
+        raise HTTPException(status_code=503, detail="Model ML nie jest gotowy")
+
+    # Wywołanie nowego recommendera
+    # UWAGA: Nasz nowy model zwraca listę tytułów (stringów), co pasuje do modelu odpowiedzi!
+    try:
+        titles = model.recommend(user_id, top_n=CACHE_MAX_ITEMS)
+    except Exception as e:
+        logger.error(f"Błąd modelu: {e}")
+
+    # 3. Posters
+    if not titles:
+        final_items = []
+    else:
+        final_items = fetch_posters_for_movies(
+            movies_data[movies_data["title"].isin(titles)], links_data, top_n=limit
         )
+    # 4. ZAPIS DO CACHE
+    if redis_client and final_items:
+        payload = {"user_id": user_id, "recommendations": final_items, "source"='model_computation'}
+        try:
+            redis_client.setex(
+                cache_key, 60 * 10, json.dumps(payload)
+            )  # Cache na 10 min
+        except Exception:
+            pass
 
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    return RecommendationResponse(
+        user_id=user_id,
+        recommendations=recommendations[:limit],
+        source="model_computation",
+        model_version="v2_knn",
+    )
