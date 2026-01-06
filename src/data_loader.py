@@ -17,7 +17,11 @@ def download_and_extract_data():
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
 
-    if not os.path.exists(MOVIES_PATH) or not os.path.exists(RATINGS_PATH):
+    if (
+        not os.path.exists(MOVIES_PATH)
+        or not os.path.exists(RATINGS_PATH)
+        or not os.path.exists(LINKS_PATH)
+    ):
         print("Pobieranie danych MovieLens...")
         r = requests.get(MOVIELENS_URL)
         z = zipfile.ZipFile(io.BytesIO(r.content))

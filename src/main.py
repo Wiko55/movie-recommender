@@ -33,14 +33,13 @@ links_data = None
 async def lifespan(app: FastAPI):
     # 1. START APLIKACJI
     logger.info("🚀 Uruchamianie Systemu Rekomendacji...")
-
+    global redis_client, movies_data, links_data
     # --- ŁADOWANIE NOWEGO MODELU ---
     try:
         logger.info("📥 Pobieranie i ładowanie danych MovieLens...")
         movies, ratings, links = load_data()
         movies_data = movies
         links_data = links
-
         logger.info("🧠 Trenowanie modelu k-NN...")
         recommender = MovieRecommender()
         recommender.fit(movies, ratings)
@@ -125,12 +124,7 @@ async def get_recommendations(user_id: int, top_n: int = 5):
             cached_data = redis_client.get(cache_key)
             if cached_data:
                 data = json.loads(cached_data)
-                return RecommendationResponse(
-                    user_id=user_id,
-                    recommendations=data["recommendations"][:limit],
-                    source="cache",
-                    model_version="v2_knn",
-                )
+                return RecommendationResponse(**data)
     except Exception as e:
         logger.error(f"Redis error: {e}")
 
@@ -169,7 +163,7 @@ async def get_recommendations(user_id: int, top_n: int = 5):
 
     return RecommendationResponse(
         user_id=user_id,
-        recommendations=recommendations[:limit],
+        recommendations=final_items,
         source="model_computation",
         model_version="v2_knn",
     )
