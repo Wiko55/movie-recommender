@@ -58,10 +58,10 @@ jobs:
     - name: Debug - Check Files
       run: ls -R data/raw
 
-    - name: Generate Model
-      run: |
-        PYTHONPATH=. uv run python -c "from src.dataprocessing import load_and_process; from src.recommender import MovieRecommender; from pathlib import Path; df=load_and_process(); print(f'DATA SHAPE: {df.shape}'); rec=MovieRecommender(); rec.fit(df); rec.save(Path('model_v1.joblib')); print('✅ Model generated')"
-
+    - name: Verify Model Training (Smoke Test)
+        run: |
+          PYTHONPATH=. uv run python -c "from src.data_loader import load_data; from src.recommender import MovieRecommender; movies, ratings, links = load_data(); rec = MovieRecommender(); rec.fit(movies, ratings); print('✅ Model training test passed')"
+    
     - name: Build Docker Image
       run: docker build -t movie-recommender:ci .
     - name: 🔍 Debug - Pokaż strukturę plików
