@@ -1,18 +1,38 @@
-services:
-  # Serwis 1: Twoja Aplikacja
-  api:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - REDIS_HOST=redis_db  # Nazwa serwisu poniżej
-    depends_on:
-      - redis_db
-    volumes:
-      - ./src:/app/src       # Hot-reloading! Zmienisz kod lokalnie -> zmieni się w kontenerze
+version: '3.8'  # Standardowa wersja
 
-  # Serwis 2: Baza Redis (Pamięć podręczna)
-  redis_db:
-    image: "redis:alpine"
+services:
+  # Serwis 1: Twoja aplikacja
+  backend:
+    build: .             # Buduje z Dockerfile w tym samym katalogu
+    container_name: ml_backend_container
     ports:
-      - "6379:6379"
+      - "8000:8000"      # Host:Kontener
+    environment:
+      - DB_HOST=db     # <--- Tu wpisz poprawną odpowiedź z lekcji wyżej
+      - DB_NAME=my_database
+      - DB_USER=my_user
+      - DB_PASSWORD=secret_password
+      - DB_PORT=5432
+    depends_on:
+      db:
+        condition: service_healthy
+  # Serwis 2: Baza danych
+  db:              # To jest "Nazwa Serwisu"
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=db
+      - POSTGRES_USER=my_user
+      - POSTGRES_PASSWORD=secret_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Zachowanie danych
+    ports:
+      - "5432:5432"      # Dostęp do bazy z Twojego Maca (np. przez DBeaver)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U my_user -d my_database"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+# Definicja wolumenu
+volumes:
+  postgres_data:
