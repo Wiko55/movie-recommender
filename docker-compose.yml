@@ -8,17 +8,20 @@ services:
     ports:
       - "8000:8000"      # Host:Kontener
     environment:
-      - DB_HOST=db     # <--- Tu wpisz poprawną odpowiedź z lekcji wyżej
-      - DB_NAME=my_database
+      - DB_HOST=db
+      - DB_NAME=db
       - DB_USER=my_user
       - DB_PASSWORD=secret_password
       - DB_PORT=5432
+      - ./data:/app/data
     depends_on:
       db:
         condition: service_healthy
+    
   # Serwis 2: Baza danych
   db:              # To jest "Nazwa Serwisu"
     image: postgres:15-alpine
+    container_name: postgres_db
     environment:
       - POSTGRES_DB=db
       - POSTGRES_USER=my_user
@@ -28,7 +31,7 @@ services:
     ports:
       - "5432:5432"      # Dostęp do bazy z Twojego Maca (np. przez DBeaver)
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U my_user -d my_database"]
+      test: ["CMD-SHELL", "pg_isready -U my_user -d db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -36,3 +39,4 @@ services:
 # Definicja wolumenu
 volumes:
   postgres_data:
+  
