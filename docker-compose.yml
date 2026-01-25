@@ -8,16 +8,39 @@ services:
     ports:
       - "8000:8000"      # Host:Kontener
     environment:
+      - DATA_DIR=/app/data
       - DB_HOST=db
       - DB_NAME=db
       - DB_USER=my_user
       - DB_PASSWORD=secret_password
       - DB_PORT=5432
+      - REDIS_HOST=redis_db
+      - CACHE_MAX_ITEMS=25
+      - MIN_VOTES=50
+    volumes:
       - ./data:/app/data
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./models:/app/models
     depends_on:
       db:
         condition: service_healthy
-    
+  frontend:
+      container_name: ml_frontend_container
+      build:
+        context: .
+        dockerfile: Dockerfile.frontend
+      ports:
+        - "8501:8501"  # Mapujemy port Streamlita na zewnątrz
+      environment:
+        # Tutaj magia: Frontend w kontenerze gada z backendem przez nazwę usługi
+        - API_URL=http://backend:8000
+        - TMDB_API_KEY=${TMDB_API_KEY}
+      depends_on:
+        - backend
+      volumes:
+        - ./src:/app/src
+
   # Serwis 2: Baza danych
   db:              # To jest "Nazwa Serwisu"
     image: postgres:15-alpine
@@ -36,7 +59,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+  # Serwis 3: Redis
+  redis_db:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
 # Definicja wolumenu
 volumes:
   postgres_data:
-  

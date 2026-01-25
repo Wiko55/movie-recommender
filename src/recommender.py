@@ -101,7 +101,7 @@ class MovieRecommender:
             if len(final_list) >= top_n:
                 break
 
-        return [final_list]
+        return final_list
 
     def get_popular_movies(self, top_n: int = 5):
         """
@@ -147,8 +147,6 @@ class MovieRecommender:
         # 2. Pobierz wektor tego filmu
         idx = self.movie_to_idx[target_movie_id]
         movie_vec = self.movie_user_mat[idx]
-        print(f"******** CSR: *******\n {self.movie_user_mat}")
-        print(f"******** CSR[idx]: *******\n {movie_vec}")
         # 3. Znajdź sąsiadów
         distances, indices = self.model.kneighbors(movie_vec, n_neighbors=top_n + 1)
 
