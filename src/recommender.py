@@ -48,6 +48,19 @@ class MovieRecommender(BaseRecommender):
         self.is_fitted: bool = False
         self.feature_matrix = None
 
+    def __getitem__(self, user_id: int) -> List[str]:
+        """
+        Przeciążenie operatora indeksowania [].
+        """
+        return self.recommend(user_id)
+
+    def __contains__(self, user_id: int) -> bool:
+        """
+        Przeciążenie operatora 'in'.
+        if user_id in recommender...
+        """
+        return user_id in self.user_cluster_map
+
     @measure_execution_time
     def fit(self, matrix: pd.DataFrame) -> None:
         """Trenuje model i liczy top filmy dla każdego klastra."""

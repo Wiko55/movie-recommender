@@ -139,14 +139,16 @@ def run_cli_mode():
                 )
                 try:
                     test_user_id = int(test_user_id)
-                    if 1 <= test_user_id <= max_id:
+                    if (
+                        1 <= test_user_id <= max_id or test_user_id not in local_model
+                    ):  # użycie przeciążonego operatora in
                         break
                 except:
-                    print("Wprowadzono zły identyfikator, spróbuj ponownie")
+                    print(f"Wprowadzono zły identyfikator, spróbuj ponownie")
 
             print(f"\n Rekomendacja dla User ID={test_user_id}:")
             try:
-                recs = local_model.recommend(test_user_id)
+                recs = local_model[test_user_id]  # Użycie przeciążonego operatora []
                 for i, movie in enumerate(recs, 1):
                     print(f"   {i}. {movie}")
             except Exception as e:
