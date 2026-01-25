@@ -45,3 +45,7 @@ uv run python src/main.py
 
 # Uruchomienie testów
 uv run pytest tests/test_all.py
+```
+
+### Ewolucja projektu
+Po wykonaniu wymagań projektowych dalej rozwijałem program. Zmieniłem bazę danych na PostgreSQL (przechowywuje oceny nowych użytkowników + hasła i loginy), dodałem opcję dotrenowania modelu "w locie" i wprowadziłem cache'owanie wyników rekomendacji (użyłem do tego Redis), dodałem opcję logowania oraz oceniania filmów oraz rozwiązałem problem cold startu, gdzie nowy użytkownik nie dostawał żadnych rekomendacji jeśli nie ocenił żadnych filmów. Natomiast program w tej formie nie spełniał wymagań projektu (cały projekt wstaje za pomocą konetenra w dockerze i jest obsługiwany za pomocą API). Cały ten kod o którym piszę znajduje się w branchu "testy".
