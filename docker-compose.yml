@@ -1,13 +1,15 @@
-version: '3.8'  # Standardowa wersja
+version: '3.8' 
 
 services:
-  # Serwis 1: Twoja aplikacja
   backend:
-    build: .             # Buduje z Dockerfile w tym samym katalogu
+    build: .           
     container_name: ml_backend_container
+    env_file:
+      - .env
     ports:
-      - "8000:8000"      # Host:Kontener
+      - "8000:8000"      
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       - DATA_DIR=/app/data
       - DB_HOST=db
       - DB_NAME=db
@@ -22,6 +24,7 @@ services:
       - ./src:/app/src
       - ./scripts:/app/scripts
       - ./models:/app/models
+      - ./tests:/app/tests
     depends_on:
       db:
         condition: service_healthy
@@ -31,18 +34,17 @@ services:
         context: .
         dockerfile: Dockerfile.frontend
       ports:
-        - "8501:8501"  # Mapujemy port Streamlita na zewnątrz
+        - "8501:8501" 
       environment:
-        # Tutaj magia: Frontend w kontenerze gada z backendem przez nazwę usługi
         - API_URL=http://backend:8000
-        - TMDB_API_KEY=${TMDB_API_KEY}
+        - TMDB_API_KEY=${TMDB_API_KEY} #klucz API do stronki z grafikami filmów
       depends_on:
         - backend
       volumes:
         - ./src:/app/src
 
-  # Serwis 2: Baza danych
-  db:              # To jest "Nazwa Serwisu"
+
+  db:          
     image: postgres:15-alpine
     container_name: postgres_db
     environment:
@@ -50,20 +52,42 @@ services:
       - POSTGRES_USER=my_user
       - POSTGRES_PASSWORD=secret_password
     volumes:
-      - postgres_data:/var/lib/postgresql/data  # Zachowanie danych
+      - postgres_data:/var/lib/postgresql/data 
     ports:
-      - "5432:5432"      # Dostęp do bazy z Twojego Maca (np. przez DBeaver)
+      - "5432:5432" 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U my_user -d db"]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
-  # Serwis 3: Redis
+
   redis_db:
     image: "redis:alpine"
     ports:
       - "6379:6379"
-# Definicja wolumenu
+
+  prometheus: #do monitorowania zachowania modelu
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    depends_on:
+      - backend
+
+  grafana: #do monitoringu Prometheusa
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin # Hasło do logowania
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:

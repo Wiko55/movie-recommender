@@ -3,10 +3,9 @@ import sys
 import time
 from functools import wraps
 
-# Konfiguracja loggera (żeby działało i w Dockerze, i w konsoli)
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",  # czas
+    format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
