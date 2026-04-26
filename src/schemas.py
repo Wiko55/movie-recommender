@@ -1,6 +1,6 @@
 from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class RecommendationResponse(BaseModel):
@@ -20,7 +20,6 @@ class LandingPage(BaseModel):
     messege: str
 
 
-# ------------------------------#
 class MovieBase(BaseModel):
     title: str
     genres: str | None = None
@@ -28,9 +27,7 @@ class MovieBase(BaseModel):
 
 class Movie(MovieBase):
     id: int
-
-    class Config:
-        from_atributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RatingCreate(BaseModel):

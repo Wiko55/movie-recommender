@@ -7,24 +7,20 @@ st.set_page_config(page_title="Movie Recommender", page_icon="🎬", layout="wid
 
 API_URL = os.getenv("API_URL", "http://backend:8000")
 
-# --- ZARZĄDZANIE SESJĄ ---
+
 if "user_id" not in st.session_state:
     st.session_state["user_id"] = None
     st.session_state["username"] = None
-
-# Inicjalizacja pamięci dla wyników wyszukiwania (ŻEBY NIE ZNIKAŁY)
 if "search_results" not in st.session_state:
     st.session_state["search_results"] = None
 if "content_results" not in st.session_state:
     st.session_state["content_results"] = None
 
-# ==========================================
-# 1. LOGOWANIE I REJESTRACJA
-# ==========================================
+
 if st.session_state["user_id"] is None:
     st.title("🔐 Zaloguj się do Kina")
 
-    with st.expander("🛠️ Debug Connection"):
+    with st.expander("🛠️ Debugowanie"):
         st.write(f"API URL: `{API_URL}`")
         if st.button("Test Ping"):
             try:
@@ -36,7 +32,7 @@ if st.session_state["user_id"] is None:
     tab_login, tab_reg = st.tabs(["Logowanie", "Rejestracja"])
 
     with tab_login:
-        username_l = st.text_input("Nick", key="login_user")
+        username_l = st.text_input("Nazwa użytkownika", key="login_user")
         password_l = st.text_input("Hasło", type="password", key="login_pass")
         if st.button("Zaloguj"):
             try:
@@ -48,7 +44,7 @@ if st.session_state["user_id"] is None:
                     data = resp.json()
                     st.session_state["user_id"] = data["user_id"]
                     st.session_state["username"] = data["username"]
-                    st.success("Zalogowano! Przeładowuję...")
+                    st.success("Zalogowano pomyślnie! Ładowanie...")
                     st.rerun()
                 else:
                     st.error(resp.json().get("detail", "Błąd logowania"))
@@ -73,10 +69,6 @@ if st.session_state["user_id"] is None:
 
     st.stop()
 
-# ==========================================
-# 2. FUNKCJE UI
-# ==========================================
-
 
 def send_rating(movie_id, rating_value):
     """Wysyła ocenę do API"""
@@ -88,7 +80,6 @@ def send_rating(movie_id, rating_value):
     try:
         resp = requests.post(f"{API_URL}/ratings/", json=payload)
         if resp.status_code == 200:
-            # Używamy toast (dymek) I success (trwały komunikat) dla pewności
             st.toast(f"✅ Oceniono na {rating_value}!", icon="⭐")
         else:
             st.error(f"Błąd zapisu: {resp.text}")
@@ -97,57 +88,53 @@ def send_rating(movie_id, rating_value):
 
 
 def render_movie_card(movie):
-    """Wyświetla pojedynczy film."""
+    """Wyświetla pojedynczy film z awatarem jeśli brak plakatu."""
     mid = movie.get("movie_id") or movie.get("id")
     title = movie.get("title", "Bez tytułu")
     poster = movie.get("poster")
 
+    print(f"[DEBUG] ID: {mid}, Title: {title}, Poster: {poster}")
+
     with st.container(border=True):
-        if poster and poster.startswith("http"):
+        if poster and str(poster).startswith("http"):
             st.image(poster, use_container_width=True)
         else:
+            safe_title = title.replace(" ", "+")
+            placeholder_url = f"https://ui-avatars.com/api/?name={safe_title}&background=random&color=fff&size=512&font-size=0.33"
             st.image(
-                "https://via.placeholder.com/300x450?text=No+Poster",
+                placeholder_url,
                 use_container_width=True,
+                caption="Brak plakatu w bazie",
             )
 
         st.markdown(f"**{title}**")
 
-        # Expander do oceny
         with st.expander("⭐ Oceń"):
             rating_val = st.slider("Gwiazdki", 0.0, 5.0, 3.0, 0.5, key=f"slider_{mid}")
-            # Callback przycisku nie powoduje zniknięcia listy, bo lista jest w session_state
             if st.button("Zapisz", key=f"btn_{mid}"):
                 send_rating(mid, rating_val)
 
-
-# ==========================================
-# 3. GŁÓWNA APLIKACJA
-# ==========================================
 
 with st.sidebar:
     st.header(f"👤 {st.session_state['username']}")
     st.caption(f"ID Użytkownika: {st.session_state['user_id']}")
     if st.button("Wyloguj"):
-        # Czyścimy sesję przy wylogowaniu
         st.session_state["user_id"] = None
         st.session_state["username"] = None
         st.session_state["search_results"] = None
         st.session_state["content_results"] = None
         st.rerun()
 
-st.title(f"Popcorn dla Ciebie, {st.session_state['username']}! 🍿")
+st.title(f"Jesteś zalogowany jako: {st.session_state['username']}! ")
 
 tab1, tab2, tab3 = st.tabs(["🔥 Rekomendacje", "🔎 Wyszukiwarka", "📊 Admin Dashboard"])
 
-# --- TAB 1: REKOMENDACJE ---
 with tab1:
     if st.button("Odśwież propozycje"):
         st.rerun()
 
     try:
         user_id = st.session_state["user_id"]
-        # Tutaj nie musimy cachować w sesji, bo rekomendacje ładują się zawsze przy wejściu
         resp = requests.get(f"{API_URL}/recommend/{user_id}?top_n=5")
 
         if resp.status_code == 200:
@@ -164,12 +151,10 @@ with tab1:
     except Exception as e:
         st.error(f"Błąd backendu: {e}")
 
-# --- TAB 2: WYSZUKIWARKA (Z NAPRAWIONYM ZNIKANIEM) ---
+
 with tab2:
     search_query = st.text_input("Wpisz tytuł filmu (np. Matrix)")
     col_search, col_content = st.columns(2)
-
-    # Przycisk 1: Szukanie SQL
     with col_search:
         if st.button("Szukaj w Bazie"):
             if search_query:
@@ -177,13 +162,10 @@ with tab2:
                 if resp.status_code == 200:
                     # ZAPISUJEMY WYNIK DO SESJI
                     st.session_state["search_results"] = resp.json()
-                    st.session_state["content_results"] = (
-                        None  # Czyścimy drugą listę dla porządku
-                    )
+                    st.session_state["content_results"] = None
                 else:
                     st.error("Błąd wyszukiwania")
 
-    # Przycisk 2: Content Based
     with col_content:
         if st.button("Podobne tematycznie (AI)"):
             if search_query:
@@ -193,18 +175,12 @@ with tab2:
                     # ZAPISUJEMY WYNIK DO SESJI
                     if "recommendations" in data:
                         st.session_state["content_results"] = data
-                        st.session_state["search_results"] = (
-                            None  # Czyścimy drugą listę
-                        )
+                        st.session_state["search_results"] = None
                     else:
                         st.info(data.get("message"))
                         st.session_state["content_results"] = None
 
     st.divider()
-
-    # --- WYŚWIETLANIE WYNIKÓW Z PAMIĘCI (SESJI) ---
-    # Dzięki temu, nawet jak klikniesz "Zapisz" (i strona się przeładuje),
-    # kod wejdzie w te if-y i wyświetli filmy znowu.
 
     if st.session_state["search_results"]:
         st.caption("Wyniki z bazy danych:")
@@ -221,8 +197,7 @@ with tab2:
             with cols[idx % 3]:
                 render_movie_card(m)
 
-# --- TAB 3: ADMIN ---
-# --- TAB 3: ADMIN ---
+
 with tab3:
     st.header("Panel Administratora")
 
@@ -230,7 +205,7 @@ with tab3:
 
     with col_actions:
         st.subheader("⚙️ Operacje MLOps")
-        if st.button("🚀 Dotrenuj Model (Retrain)"):
+        if st.button("Dotrenuj Model"):
             with st.spinner("Wysyłanie sygnału do backendu..."):
                 try:
                     resp = requests.post(f"{API_URL}/admin/retrain")

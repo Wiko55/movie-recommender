@@ -10,6 +10,7 @@ import bcrypt
 import pandas as pd
 import redis
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from sqlalchemy import desc, func, text
 from sqlalchemy.orm import Session
@@ -22,18 +23,13 @@ from src.recommender import MovieRecommender
 from src.schemas import RatingCreate
 from src.tmdb_client import fetch_posters_for_movies
 
-# ------------------------------
-
-# Konfiguracja logowania
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Konfiguracja Redisa
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 
 
-# Globalny słownik na modele
 ml_models = {}
 redis_client = None
 CACHE_MAX_ITEMS = 50
@@ -45,7 +41,6 @@ content_engine = ContentEngine()
 models.Base.metadata.create_all(bind=engine)
 
 
-# ------------------------------
 def get_password_hash(password):
     rpwd_bytes = password[:70].encode("utf-8")
     salt = bcrypt.gensalt()
@@ -63,7 +58,6 @@ def verify_password(plain_password, hashed_password):
         return False
 
 
-# ------------------------------
 def retrain_model_background(db_session: Session):
     """
     Funkcja do ponownego trenowania modelu w tle.
@@ -105,11 +99,9 @@ def retrain_model_background(db_session: Session):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. START APLIKACJI
-    logger.info("🚀 Uruchamianie Systemu Rekomendacji...")
+    logger.info("Uruchamianie Systemu Rekomendacji")
     global redis_client, movies_data, links_data, ratings_data
     list_of_models = glob.glob("app/models/*.pkl")
-    # Czytanie danych z CSV
     try:
         logger.info("📥 Pobieranie i ładowanie danych MovieLens...")
         movies, ratings, links = load_data()
@@ -127,6 +119,9 @@ async def lifespan(app: FastAPI):
     # Zmiana iterowania indexów
     try:
         db = SessionLocal()
+        max_id = db.query(func.max(models.User.id))
+        max_id = 0 if max_id is None else max_id
+        start_id = max(start_id, max_id)
         # Komenda SQL, która przesuwa licznik
         db.execute(text(f"ALTER SEQUENCE users_id_seq RESTART WITH {start_id};"))
         db.commit()
@@ -160,11 +155,9 @@ async def lifespan(app: FastAPI):
             pickle.dump(recommender, open("models/recommender_model_initial.pkl", "wb"))
             logger.info("💾 Zapisano model początkowy do pliku.")
         except Exception as e:
-            logge.error(f"❌ Błąd krytyczny podczas ładowania modelu: {e}")
+            logger.error(f"❌ Błąd krytyczny podczas ładowania modelu: {e}")
             ml_models["latest"] = None
-    # -------------------------------
 
-    # Redis Connection
     global redis_client
     try:
         redis_client = redis.Redis(
@@ -178,9 +171,8 @@ async def lifespan(app: FastAPI):
         logger.warning(f"⚠️ Nie można połączyć z Redisem: {e}. Działamy bez Cache.")
         redis_client = None
 
-    yield  # Tutaj aplikacja działa i obsługuje zapytania...
+    yield
 
-    # 2. ZAMYKANIE APLIKACJI
     ml_models.clear()
     if redis_client:
         redis_client.close()
@@ -188,9 +180,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, title="Movie Recommender API")
+Instrumentator().instrument(app).expose(app)
 
 
-# Modele Pydantic
 class MovieItem(BaseModel):
     title: str
     poster: str | None = None
@@ -229,7 +221,7 @@ def read_root():
 def health_check():
     return HealthCheck(
         status="ok",
-        model_loaded="latest" in ml_models and ml_models["latest"] is not None,
+        model_loaded=len(ml_models) > 0,
         redis_connected=redis_client is not None and redis_client.ping(),
     )
 
@@ -242,7 +234,6 @@ async def get_recommendations(user_id: int, top_n: int = 5):
     limit = min(top_n, CACHE_MAX_ITEMS)
     cache_key = f"rec_img_v1_{user_id}"
 
-    # 1. CACHE (Redis)
     try:
         if redis_client:
             cached_data = redis_client.get(cache_key)
@@ -252,19 +243,15 @@ async def get_recommendations(user_id: int, top_n: int = 5):
     except Exception as e:
         logger.error(f"Redis error: {e}")
 
-    # 2. MODEL ML (Obliczenia)
     model = ml_models.get("latest")
     if not model:
         raise HTTPException(status_code=503, detail="Model ML nie jest gotowy")
 
-    # Wywołanie nowego recommendera
-    # UWAGA: Nasz nowy model zwraca listę tytułów (stringów), co pasuje do modelu odpowiedzi!
     try:
         titles = model.recommend(user_id, top_n=CACHE_MAX_ITEMS)
     except Exception as e:
         logger.error(f"Błąd modelu: {e}")
 
-    # 3. Posters
     if not titles:
         logger.info(f"Cold Start dla User {user_id} - serwuję Hity Globalne")
         titles = model.get_popular_movies(top_n=CACHE_MAX_ITEMS)
@@ -275,7 +262,7 @@ async def get_recommendations(user_id: int, top_n: int = 5):
         final_items = fetch_posters_for_movies(
             movies_data[movies_data["title"].isin(titles)], links_data, top_n=limit
         )
-    # 4. ZAPIS DO CACHE
+
     if redis_client and final_items:
         payload = {
             "user_id": user_id,
@@ -285,8 +272,10 @@ async def get_recommendations(user_id: int, top_n: int = 5):
         }
         try:
             redis_client.setex(
-                cache_key, 60 * 10, json.dumps(payload)
-            )  # Cache na 10 min
+                cache_key,
+                60 * 10,
+                json.dumps(payload),  # na 10 minut cache ustawiony
+            )
         except Exception:
             pass
 
@@ -304,23 +293,19 @@ async def get_similar_movies(movie_title: str, top_n: int = 5):
     Rekomenduje filmy podobne do podanego tytułu.
     """
     limit = min(top_n, CACHE_MAX_ITEMS)
-    # Prosty cache key
     cache_key = f"rec_movie_{movie_title.replace(' ', '_').lower()}"
 
-    # 1. CACHE
     if redis_client:
         cached = redis_client.get(cache_key)
         if cached:
             return RecommendationResponse(**json.loads(cached))
 
-    # 2. MODEL
     model = ml_models.get("latest")
     if not model or movies_data is None:
         raise HTTPException(status_code=503, detail="System niegotowy")
 
     titles = model.get_recommendations_for_movie(movie_title, top_n=limit)
 
-    # 3. PLAKATY
     if not titles:
         final_items = []
     else:
@@ -335,7 +320,6 @@ async def get_similar_movies(movie_title: str, top_n: int = 5):
         "model_version": "v2_knn",
     }
 
-    # 4. ZAPIS DO CACHE
     if redis_client:
         redis_client.setex(cache_key, 600, json.dumps(response))
 
@@ -349,14 +333,11 @@ def get_movies(
     search: str | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(models.Movie)  # Tworzymy zapytanie, ale jeszcze go nie wysyłamy
+    query = db.query(models.Movie)
 
-    # 2. Jeśli użytkownik wpisał coś w wyszukiwarkę -> filtrujemy
     if search:
-        # .contains = SQL LIKE '%tekst%' (szuka fragmentu tekstu)
         query = query.filter(models.Movie.title.contains(search))
 
-    # 3. Dopiero na końcu ucinamy (limit) i pobieramy (all)
     movies = query.offset(skip).limit(limit).all()
     return movies
 
@@ -445,7 +426,6 @@ def rate_movie(rating: RatingCreate, db: Session = Depends(get_db)):
     db.commit()
 
     if redis_client:
-        # Usuwa cache rekomendacji dla tego usera, bo zmienił swoją opinę
         cache_key = f"rec_img_v1_{rating.user_id}"
         redis_client.delete(cache_key)
     return {"message": "Ocena zapisana"}
@@ -457,32 +437,26 @@ def get_admin_stats(db: Session = Depends(get_db)):
     Zwraca statystyki łączone: Baza SQL (nowe) + Pliki CSV (stare MovieLens).
     """
     try:
-        # 1. Liczymy dane z SQL (to co wyklikali Twoi userzy)
         sql_ratings_count = db.query(models.Rating).count()
         sql_users_count = db.query(models.User).count()
 
-        # 2. Liczymy dane z CSV (historia MovieLens)
         csv_ratings_count = len(ratings_data) if ratings_data is not None else 0
-        # W CSV userzy to po prostu unikalne ID
         csv_users_count = (
             ratings_data["userId"].nunique() if ratings_data is not None else 0
         )
 
-        # 3. Najpopularniejsze filmy (Hybrydowo jest trudno, więc bierzemy z CSV dla demo)
         top_movies = []
         if ratings_data is not None and movies_data is not None:
-            # Liczymy ile razy każdy film był oceniany w CSV
             popular = ratings_data.groupby("movieId").size().reset_index(name="counts")
             popular = popular.sort_values("counts", ascending=False).head(5)
 
-            # Łączymy z tytułami
             merged = popular.merge(movies_data, on="movieId")
 
             for _, row in merged.iterrows():
                 top_movies.append(
                     {
                         "title": row["title"],
-                        "count": int(row["counts"]),  # Konwersja na zwykły int
+                        "count": int(row["counts"]),
                     }
                 )
 
@@ -534,8 +508,7 @@ def recommend_by_content(title: str, top_n: int = 5):
         )
 
 
-# ------------------------------
-# --DOTRENOWYWANIE MODELU W TLE--
+# DOTRENOWYWANIE MODELU
 @app.post("/admin/retrain", summary="Retrain ML Model in Background")
 def retrain_model_endpoint(
     background_tasks: BackgroundTasks, db: Session = Depends(get_db)
@@ -547,8 +520,6 @@ def retrain_model_endpoint(
     return {"message": "Ponowne trenowanie modelu zostało uruchomione w tle."}
 
 
-# ------------------------------
-# Logowanie użytkowników i rejestracja
 @app.post("/register", summary="Register a new user")
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     """

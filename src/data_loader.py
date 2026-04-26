@@ -26,7 +26,6 @@ def download_and_extract_data():
         r = requests.get(MOVIELENS_URL)
         z = zipfile.ZipFile(io.BytesIO(r.content))
 
-        # Wyciągamy pliki z podkatalogu ml-latest-small do naszego katalogu data
         for file in z.namelist():
             if file.endswith("movies.csv"):
                 with open(MOVIES_PATH, "wb") as f:

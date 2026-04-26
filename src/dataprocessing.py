@@ -2,16 +2,14 @@ import logging
 
 import pandas as pd
 
-from src import config  # Importowanie ustawień z config.py
+from src import config
 
-# 1. Inicjalizacja loggera dla tego konkretnego pliku
 logger = logging.getLogger(__name__)
 
 
 def load_and_process() -> pd.DataFrame:
     """
-    Proces ETL: Wczytuje surowe CSV, łączy je, filtruje i zwraca macierz.
-    Pobiera ścieżki i nazwy kolumn z pliku config.py.
+    Proces ETL
     """
 
     movies_path = config.MOVIES_PATH
@@ -23,7 +21,7 @@ def load_and_process() -> pd.DataFrame:
             f"Brakuje movies.csv lub ratings.csv w {config.DATA_DIR}"
         )
 
-    logger.info("Rozpoczynanie procesu ETL (Extract-Transform-Load)...")
+    logger.info("Rozpoczynanie procesu ETL")
 
     try:
         df_movies = pd.read_csv(movies_path)
