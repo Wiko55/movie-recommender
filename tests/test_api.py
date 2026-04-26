@@ -11,8 +11,6 @@ from src.data_loader import load_data
 from src.main import app
 
 
-# FIXTURE: To jest "włącznik" aplikacji dla testów.
-# Dzięki "with TestClient(app) as c", odpalamy zdarzenia "lifespan" (ładowanie modelu).
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as c:
@@ -23,7 +21,6 @@ def test_health_check(client):
     """Sprawdza czy endpoint /health zwraca 200 OK i status"""
     response = client.get("/health")
     assert response.status_code == 200
-    # Teraz running_model musi być True, bo "with TestClient" go załadował
     assert response.json() == {
         "status": "ok",
         "model_loaded": True,

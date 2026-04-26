@@ -97,13 +97,13 @@ def render_movie_card(movie):
 
     with st.container(border=True):
         if poster and str(poster).startswith("http"):
-            st.image(poster, use_container_width=True)
+            st.image(poster, width="stretch")
         else:
             safe_title = title.replace(" ", "+")
             placeholder_url = f"https://ui-avatars.com/api/?name={safe_title}&background=random&color=fff&size=512&font-size=0.33"
             st.image(
                 placeholder_url,
-                use_container_width=True,
+                width="stretch",
                 caption="Brak plakatu w bazie",
             )
 
