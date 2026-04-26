@@ -116,13 +116,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Błąd podczas ładowania danych MovieLens: {e}")
         start_id = 10000
-    # Zmiana iterowania indexów
     try:
         db = SessionLocal()
-        max_id = db.query(func.max(models.User.id))
+        max_id = db.query(func.max(models.User.id)).scalar()
         max_id = 0 if max_id is None else max_id
         start_id = max(start_id, max_id)
-        # Komenda SQL, która przesuwa licznik
         db.execute(text(f"ALTER SEQUENCE users_id_seq RESTART WITH {start_id};"))
         db.commit()
         db.close()
@@ -131,7 +129,6 @@ async def lifespan(app: FastAPI):
         logger.warning(
             f"⚠️ Nie udało się zaktualizować sekwencji ID (może to pierwsze uruchomienie?): {e}"
         )
-    # --- ŁADOWANIE NOWEGO MODELU ---
     loaded_from_file = False
     if list_of_models:
         latest_model_file = max(list_of_models, key=os.path.getctime)
@@ -140,7 +137,6 @@ async def lifespan(app: FastAPI):
             ml_models["latest"] = recommender
             loaded_from_file = True
             logger.info(f"✅ Załadowano model z pliku: {latest_model_file}")
-    # --- JEŚLI BRAK MODELU W PLIKU, ŁADUJEMY Z DANYCH I GO ZAPISUJEMY---
     if not loaded_from_file:
         logger.info("⚠️ Brak modelu w plikach. Trenuję od zera...")
         try:
