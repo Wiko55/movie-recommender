@@ -34,7 +34,7 @@ This project was designed with **MLOps and Cloud/FinOps principles** in mind. In
 | **Machine Learning** | Scikit-learn, Pandas, SciPy |
 | **DevOps / MLOps** | Docker, Docker Compose |
 
-## 🚀 Quick Start (One-Click Deployment)
+## Quick Start (One-Click Deployment)
 
 The entire infrastructure is orchestrated via Docker Compose. You do not need to install local Python dependencies to run the service.
 
@@ -42,7 +42,7 @@ The entire infrastructure is orchestrated via Docker Compose. You do not need to
 docker-compose up --build
 ```
 
-### 🌐 Access Points
+### Access Points
 
 Once the containers are successfully orchestrated, the entire ecosystem is immediately accessible:
 
