@@ -9,7 +9,7 @@ A containerized, full-stack recommendation engine built with an API-first approa
 <img width="1440" height="812" alt="image" src="https://github.com/user-attachments/assets/bc4f0710-5002-4828-a053-24f0a6364505" />
 
 
-## 🎯 Architecture & Engineering Focus
+## Architecture & Engineering Focus
 
 This project was designed with **MLOps and Cloud/FinOps principles** in mind. Instead of a monolithic script, the system is separated into distinct layers (API, Data, Cache, Frontend) to simulate a production-ready environment.
 
@@ -42,5 +42,28 @@ The entire infrastructure is orchestrated via Docker Compose. You do not need to
 docker-compose up --build
 ```
 
+### 🌐 Access Points
 
+Once the containers are successfully orchestrated, the entire ecosystem is immediately accessible:
+
+* **Frontend Interface (Streamlit):** [http://localhost:8501](http://localhost:8501)
+* **API Gateway & Docs (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+
+### API endpoints
+
+The service exposes a modular API structured around strict separation of concerns. Complete JSON payload schemas and interactive testing are available via the Swagger UI.
+
+**1. Infrastructure & Maintenance**
+* `GET /health` – Verifies database connectivity, Redis cache status, and overall API uptime.
+* `POST /admin/retrain` – Dispatches an asynchronous background task to recalculate TF-IDF and k-NN matrices without blocking the main event loop.
+
+**2. Authentication Layer**
+* `POST /register` – Handles secure user registration with bcrypt credential hashing.
+* `POST /login` – Authenticates users and issues JWT (JSON Web Tokens) for protected endpoint access.
+
+**3. Machine Learning Inference**
+* `GET /recommend/{user_id}` – **Collaborative Filtering:** Returns k-NN based recommendations utilizing historical user-interaction vectors.
+* `GET /content/{title}` – **Content-Based Filtering:** Executes TF-IDF cosine similarity search across item metadata to find related content.
+* 
 [![CI Pipeline](https://github.com/Wiko55/movie-recommender/actions/workflows/ci.yml/badge.svg)](https://github.com/Wiko55/movie-recommender/actions/workflows/ci.yml)
