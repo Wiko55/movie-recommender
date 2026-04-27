@@ -27,7 +27,7 @@ This project was designed with **MLOps and Cloud/FinOps principles** in mind. In
 
 | Layer | Technology |
 | :--- | :--- |
-| **Backend ** | FastAPI, SQLAlchemy|
+| **Backend** | FastAPI, SQLAlchemy|
 | **Frontend** | Streamlit |
 | **Database** | PostgreSQL |
 | **Caching Layer** | Redis |
